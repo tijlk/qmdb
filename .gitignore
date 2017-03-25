@@ -1,0 +1,15 @@
+# Python, Pandas, Jupyter
+*.df
+*.pdf
+*.pyc
+*.ipynb_checkpoints/
+
+# PyTest Coverage
+.coverage
+htmlcov/
+
+# IntelliJ IDEA
+build/
+*.iml
+.idea/
+.cache/
