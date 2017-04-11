@@ -1,9 +1,14 @@
-import requests
+from qmdb.database.database import Database
+from qmdb.movie.movie import Movie
 
-def imdbid_to_rturl(imdbid):
-    imdbid_str = imdbid.zfill(7)
-    omdb_url = 'http://www.omdbapi.com/?i=tt' + imdbid_str + '&tomatoes=true'
-    r = requests.get(omdb_url)
-    print r
 
-imdbid_to_rturl(3315342)
+if __name__ == "__main__":
+    db = Database('test.sqlite')
+
+    imdbids = [133093, 3315342]
+    for imdbid in imdbids:
+        movie = Movie(imdbid)
+        movie.add_rt_url()
+        db.add_movie(movie)
+
+    db.print()
