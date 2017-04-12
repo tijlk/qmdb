@@ -5,7 +5,7 @@ class Database():
             self.load(filename)
         else:
             self.initialize(filename)
-        self.movies = []
+        self.movies = {}
 
     @staticmethod
     def load(filename):
@@ -16,8 +16,8 @@ class Database():
         print("Initializing database at {}".format(filename))
 
     def add_movie(self, movie):
-        self.movies.append(movie)
+        self.movies[movie.imdbid] = movie
 
     def print(self):
         for movie in self.movies:
-            movie.print()
+            self.movies[movie].print()

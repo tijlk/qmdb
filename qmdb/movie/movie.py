@@ -1,13 +1,11 @@
-from qmdb.interfaces.omdb import imdbid_to_rturl
+from qmdb.movie.utils import humanized_time
 
 
 class Movie(object):
     def __init__(self, imdbid):
         self.imdbid = imdbid
         self.tomato_url = None
-
-    def add_rt_url(self):
-        self.tomato_url = imdbid_to_rturl(self.imdbid)
+        self.omdb_updated = None
 
     def print(self):
-        print("{} - {}".format(self.imdbid, self.tomato_url))
+        print("{} - {} - Updated: {}".format(self.imdbid, self.tomato_url, humanized_time(self.omdb_updated)))
