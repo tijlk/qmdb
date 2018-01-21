@@ -8,4 +8,5 @@ class Movie(object):
         self.omdb_updated = None
 
     def print(self):
-        print("{} - {} - Updated: {}".format(self.imdbid, self.tomato_url, humanized_time(self.omdb_updated)))
+        print("{} - {} - Updated: {}".format(self.imdbid, self.tomato_url,
+                                             humanized_time(self.omdb_updated)))

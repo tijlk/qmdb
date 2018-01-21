@@ -5,3 +5,7 @@ def test_rturl_from_imdbid():
     matrix_url = OMDBScraper.imdbid_to_rturl(133093)
     print(matrix_url)
     assert matrix_url == 'http://www.rottentomatoes.com/m/matrix/'
+
+
+def test_bad_connection():
+    pass

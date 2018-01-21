@@ -1,8 +1,8 @@
-class Scraper(object):
-    def __init__(self):
-        pass
-
+class Scraper:
     def refresh_movie(self, movie):
-        if movie:
-            print("Refreshing movie")
-        return movie
+        # Check that a valid movie was supplied
+        try:
+            _ = movie.imdbid
+        except AttributeError:
+            print("Invalid movie supplied")
+            return None
