@@ -18,9 +18,10 @@ class CritickerScraper(Scraper):
 
     def refresh_movie(self, movie):
         super().refresh_movie(movie)
+        print("Refreshing Criticker info for '{} ({})'".format(movie.title, movie.year))
         movie_info = self.get_movie_info(movie.crit_url)
         if isinstance(movie_info, dict):
-            movie.load_from_dict(movie_info)
+            movie.update_from_dict(movie_info)
         return movie
 
     def get_movie_info(self, crit_url):
@@ -46,7 +47,7 @@ class CritickerScraper(Scraper):
         year = int(match.groups()[0])
         return year
 
-    def get_movielist_movie_attributes(self, movie_html):
+    def get_movielist_movie_attributes(self, movie_html, crit_popularity_page=None):
         """
         Gets some attributes from the Criticker html for a single movie in a movie list
         :param movie_html: a BeautifulSoup object containing the basic info for a single movie
@@ -58,13 +59,15 @@ class CritickerScraper(Scraper):
         title = a.get('title')
         year = self.get_year_from_movielist_title(a.text)
         movie_info = {'crit_id': id,
+                      'crit_popularity_page': crit_popularity_page,
                       'crit_url': url,
                       'title': title,
-                      'year': year}
+                      'year': year,
+                      'date_added': arrow.now()}
         return movie_info
 
     def get_movie_list_page(self, pagenr=1, min_popularity=1):
-        criticker_url = 'https://www.criticker.com/films/?filter=n{}zor&view=all'.format(min_popularity)
+        criticker_url = 'https://www.criticker.com/films/?filter=n{}zor&p={}'.format(min_popularity, pagenr)
         try:
             r = requests.get(criticker_url)
             time.sleep(1)
@@ -74,7 +77,7 @@ class CritickerScraper(Scraper):
         soup = BeautifulSoup(r.text, "lxml")
         movie_list = soup.find('ul', attrs={'class': 'fl_titlelist'})\
                          .find_all('li', attrs={'id': re.compile(r'fl_titlelist_title_\d+')})
-        movies = [self.get_movielist_movie_attributes(h) for h in movie_list]
+        movies = [self.get_movielist_movie_attributes(h, crit_popularity_page=pagenr) for h in movie_list]
         nr_pages_text = str(next(soup.find('p', attrs={'id': 'fl_nav_pagenums_page'}).children))
         nr_pages = int(re.match(r'Page\s+\d+\s+of\s+(\d+)\s*', nr_pages_text).groups()[0])
         return movies, nr_pages

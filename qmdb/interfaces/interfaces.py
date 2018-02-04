@@ -6,3 +6,4 @@ class Scraper:
         except AttributeError:
             print("Invalid movie supplied")
             return None
+
