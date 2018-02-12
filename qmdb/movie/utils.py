@@ -6,3 +6,4 @@ def humanized_time(timestamp, fallback="Not updated before"):
         return timestamp.humanize(arrow.now())
     else:
         return fallback
+

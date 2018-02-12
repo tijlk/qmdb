@@ -10,6 +10,10 @@ from bs4 import BeautifulSoup
 import re
 import time
 from qmdb.config import config
+import numpy as np
+
+
+banned_movies = {154: 'Apocalypse Now Redux'}
 
 
 class CritickerScraper(Scraper):
@@ -18,18 +22,20 @@ class CritickerScraper(Scraper):
 
     def refresh_movie(self, movie):
         super().refresh_movie(movie)
-        print("Refreshing Criticker info for '{} ({})'".format(movie.title, movie.year))
-        movie_info = self.get_movie_info(movie.crit_url)
-        if isinstance(movie_info, dict):
-            movie.update_from_dict(movie_info)
-        return movie
+        try:
+            movie_info = self.get_movie_info(movie.crit_url)
+            if isinstance(movie_info, dict):
+                movie.update_from_dict(movie_info)
+            return movie
+        except:
+            return None
 
     def get_movie_info(self, crit_url):
         try:
             r = requests.get(crit_url, cookies=self.cookies)
             time.sleep(1)
         except ConnectionError:
-            print("Could not connect to Criticker.")
+            print("Could not connect to Criticker or criticker URL invalid.")
             return None
         soup = BeautifulSoup(r.text, "lxml")
         imdb_url = soup.find('p', attrs={'class': 'fi_extrainfo', 'id': 'fi_info_ext'}).find('a').get('href')
@@ -70,7 +76,7 @@ class CritickerScraper(Scraper):
         criticker_url = 'https://www.criticker.com/films/?filter=n{}zor&p={}'.format(min_popularity, pagenr)
         try:
             r = requests.get(criticker_url)
-            time.sleep(1)
+            time.sleep(2)
         except ConnectionError:
             print("Could not connect to Criticker.")
             return None
@@ -78,16 +84,17 @@ class CritickerScraper(Scraper):
         movie_list = soup.find('ul', attrs={'class': 'fl_titlelist'})\
                          .find_all('li', attrs={'id': re.compile(r'fl_titlelist_title_\d+')})
         movies = [self.get_movielist_movie_attributes(h, crit_popularity_page=pagenr) for h in movie_list]
+        movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
         nr_pages_text = str(next(soup.find('p', attrs={'id': 'fl_nav_pagenums_page'}).children))
         nr_pages = int(re.match(r'Page\s+\d+\s+of\s+(\d+)\s*', nr_pages_text).groups()[0])
         return movies, nr_pages
 
-    def get_movies(self, min_popularity=1, debug=False):
+    def get_movies(self, min_popularity=1, debug=False, max_pages=2):
         print("Downloading movies from Criticker with a minimum popularity of {}.".format(min_popularity))
         _, nr_pages = self.get_movie_list_page(min_popularity=min_popularity)
         movies = []
         if debug:
-            nr_pages = min([2, nr_pages])
+            nr_pages = min([max_pages, nr_pages])
         for pagenr in range(1, nr_pages+1):
             print("   Getting page {} of {}".format(pagenr, nr_pages))
             movies_this_page, _ = self.get_movie_list_page(pagenr=pagenr, min_popularity=min_popularity)

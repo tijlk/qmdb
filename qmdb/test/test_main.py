@@ -1,9 +1,6 @@
-from qmdb.interfaces.omdb import OMDBScraper
-from qmdb.interfaces.criticker import CritickerScraper
-from qmdb.movie.movie import Movie
-import arrow
-from mock import patch, MagicMock
 import pytest
+
+from qmdb.interfaces.omdb import OMDBScraper
 from qmdb.utils.utils import no_internet
 
 

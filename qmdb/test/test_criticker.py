@@ -1,12 +1,13 @@
-from qmdb.interfaces.omdb import OMDBScraper
+import os
+
+import arrow
+import pytest
+from mock import patch
+
+from qmdb.database.database import SQLiteDatabase
 from qmdb.interfaces.criticker import CritickerScraper
 from qmdb.movie.movie import Movie
-import arrow
-from mock import patch, MagicMock
-from qmdb.database.database import SQLiteDatabase
 from qmdb.utils.utils import no_internet
-import pytest
-import os
 
 
 def test_config_cookies():

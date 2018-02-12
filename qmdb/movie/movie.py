@@ -17,8 +17,9 @@ class Movie(object):
         self.update_from_dict(movie_info)
 
     def print(self):
-        print("{} - {} ({}) - IMDb: {} - RT: {} - Updated: {}".format(
-            self.crit_id, self.title, self.year, self.imdbid, self.tomato_url, humanized_time(self.omdb_updated)))
+        print("{} - {} ({}) - Criticker updated {} - OMDB updated {}".format(
+            self.crit_id, self.title, self.year, humanized_time(self.crit_updated), humanized_time(self.omdb_updated)))
+
     @staticmethod
     def replace_if_not_none(new_value, old_value):
         return new_value if new_value is not None else old_value

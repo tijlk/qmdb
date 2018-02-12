@@ -1,3 +1,5 @@
+from qmdb.database.database import MySQLDatabase
+
 try:
     import httplib
 except ModuleNotFoundError:
@@ -13,3 +15,11 @@ def no_internet():
     except:
         conn.close()
         return True
+
+
+def create_copy_of_table(src, tgt, schema='qmdb_test'):
+    db = MySQLDatabase(schema=schema)
+    db.remove_table(tgt)
+    db.connect()
+    db.c.execute("create table {} as select * from {}".format(tgt, src))
+    db.close()

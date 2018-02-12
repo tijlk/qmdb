@@ -2,6 +2,15 @@ from qmdb.database.database import SQLiteDatabase, MySQLDatabase, MovieNotInData
 from qmdb.movie.movie import Movie
 from qmdb.interfaces.omdb import OMDBScraper
 from qmdb.interfaces.criticker import CritickerScraper
+from qmdb.interfaces.updater import Updater
+
+
+def get_criticker_movies(db, crit_scraper, min_popularity=8):
+    movies = crit_scraper.get_movies(min_popularity=min_popularity)
+    print("\nSaving movie information to the database\n")
+    for movie in movies:
+        db.set_movie(Movie(movie))
+    db.print()
 
 
 if __name__ == "__main__":
@@ -9,23 +18,10 @@ if __name__ == "__main__":
     db = MySQLDatabase()
     omdb_scraper = OMDBScraper()
     crit_scraper = CritickerScraper()
-    movies = crit_scraper.get_movies(min_popularity=10, debug=True)
-
-    print("\nSaving movie information to the database\n")
-    for movie in movies:
-        db.set_movie(Movie(movie))
-    db.print()
+    updater = Updater()
+    get_criticker_movies(db, crit_scraper)
 
     print("\nRefreshing movie information from Criticker and OMDB\n")
-    for crit_id in db.movies:
-        try:
-            movie = db.get_movie(crit_id)
-        except MovieNotInDatabaseError:
-            print("This is weird.")
-            pass
-        else:
-            movie = crit_scraper.refresh_movie(movie)
-            movie = omdb_scraper.refresh_movie(movie)
-            db.set_movie(movie)
+    while True:
+        updater.update_movies(db, n=20, multiplier_omdb=1, multiplier_criticker=1, weibull_lambda=5)
     db.print()
-    db.close()

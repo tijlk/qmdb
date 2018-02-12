@@ -2,6 +2,7 @@ import sqlite3
 import os
 from qmdb.movie.movie import Movie
 from arrow import Arrow
+import arrow
 import copy
 from qmdb.config import config
 import pymysql.cursors
@@ -54,8 +55,12 @@ class Database:
             raise MovieNotInDatabaseError(crit_id=crit_id)
 
     def print(self):
-        for movie in self.movies:
-            self.movies[movie].print()
+        movies = sorted(list(self.movies.values()),
+                        key=lambda x: max(arrow.get('1970-01-01') if x.crit_updated is None else x.crit_updated,
+                                          arrow.get('1970-01-01') if x.omdb_updated is None else x.omdb_updated),
+                        reverse=True)
+        for movie in movies[:10]:
+            self.movies[movie.crit_id].print()
 
     @staticmethod
     def make_dict_db_safe(d):
@@ -204,7 +209,7 @@ class MySQLDatabase(Database):
             self.c.execute(sql)
         self.close()
 
-    def load(self):
+    def load(self, verbose=False):
         self.connect()
         try:
             self.c.execute("select * from {}".format(self.movies_table))
@@ -214,7 +219,8 @@ class MySQLDatabase(Database):
             raise
         self.movies = {movie['crit_id']: Movie(movie) for movie in movies}
         self.close()
-        print("database loaded.")
+        if verbose:
+            print("database loaded.")
 
     def update_record(self, tbl, d, key):
         self.connect()

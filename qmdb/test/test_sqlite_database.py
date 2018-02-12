@@ -1,13 +1,11 @@
-from qmdb.interfaces.omdb import OMDBScraper
-from qmdb.interfaces.criticker import CritickerScraper
-from qmdb.movie.movie import Movie
-import arrow
-from mock import patch, MagicMock
-from qmdb.database.database import SQLiteDatabase, MovieNotInDatabaseError
-import pytest
-import sqlite3
 import os
+import sqlite3
 from shutil import copyfile
+
+import pytest
+
+from qmdb.database.database import SQLiteDatabase, MovieNotInDatabaseError
+from qmdb.movie.movie import Movie
 
 
 def test_database_init_existing_file():

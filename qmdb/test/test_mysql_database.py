@@ -1,22 +1,9 @@
-from qmdb.interfaces.omdb import OMDBScraper
-from qmdb.interfaces.criticker import CritickerScraper
-from qmdb.movie.movie import Movie
 import arrow
-from mock import patch, MagicMock
-from qmdb.database.database import MySQLDatabase, MovieNotInDatabaseError
 import pytest
-import sqlite3
-import os
-from shutil import copyfile
-import pymysql
 
-
-def create_copy_of_table(src, tgt, schema='qmdb_test'):
-    db = MySQLDatabase(schema=schema)
-    db.remove_table(tgt)
-    db.connect()
-    db.c.execute("create table {} as select * from {}".format(tgt, src))
-    db.close()
+from qmdb.database.database import MySQLDatabase, MovieNotInDatabaseError
+from qmdb.movie.movie import Movie
+from qmdb.utils.utils import create_copy_of_table
 
 
 def test_database_init_existing_file():
@@ -24,7 +11,7 @@ def test_database_init_existing_file():
     assert db.c is not None
     assert isinstance(db.movies, dict)
     print(db.movies.keys())
-    assert list(db.movies.keys()) == [1234]
+    assert list(db.movies.keys()) == [1234, 49141]
 
 
 def test_database_init_from_scratch_new():
@@ -40,7 +27,7 @@ def test_database_init_from_scratch_new():
 def test_database_init_from_scratch_existing():
     create_copy_of_table('movies', 'movies_copy')
     db = MySQLDatabase(schema='qmdb_test', movies_table='movies_copy')
-    assert list(db.movies.keys()) == [1234]
+    assert list(db.movies.keys()) == [1234, 49141]
     db = MySQLDatabase(schema='qmdb_test', movies_table='movies_copy', from_scratch=True)
     assert list(db.movies.keys()) == []
     db.remove_table('movies_copy')
