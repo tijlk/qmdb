@@ -6,12 +6,11 @@ import arrow
 import copy
 from qmdb.config import config
 import pymysql.cursors
-
+from itertools import groupby
 
 class Database:
-    def __init__(self, from_scratch=False, movies_table='movies'):
+    def __init__(self, from_scratch=False):
         self.movies = {}
-        self.movies_table = movies_table
         self.conn = None
         self.c = None
         self.load_or_initialize(from_scratch=from_scratch)
@@ -35,17 +34,6 @@ class Database:
     def load(self):
         raise NotImplementedError
 
-    def set_movie(self, movie, overwrite=True):
-        crit_id = movie.crit_id
-        if not overwrite:
-            if crit_id in self.movies:
-                print("Movie CritickerID {} is already in the database".format(crit_id))
-        else:
-            if crit_id in self.movies:
-                self.movies[crit_id].update_from_dict(movie.to_dict())
-            else:
-                self.movies[crit_id] = movie
-            self.update_record(self.movies_table, self.movies[crit_id].to_dict(), 'crit_id')
 
     def get_movie(self, crit_id):
         try:
@@ -70,111 +58,81 @@ class Database:
                 d[k] = d[k].format()
         return d
 
-    def update_record(self, tbl, d, key):
-        raise NotImplementedError
-
-
-class SQLiteDatabase(Database):
-    def __init__(self, filename, from_scratch=False):
-        self.filename = filename
-        self.columns_movies = {
-            'crit_id': 'integer primary key',
-            'crit_popularity_page': 'integer',
-            'crit_url': 'text',
-            'title': 'text',
-            'year': 'integer',
-            'imdbid': 'integer',
-            'tomato_url': 'text',
-            'date_added': 'text',
-            'omdb_updated': 'text',
-            'crit_updated': 'text'
-        }
-        super().__init__(from_scratch=from_scratch)
-
-    def load_or_initialize(self, from_scratch=False):
-        if from_scratch:
-            self.initialize()
-        else:
-            try:
-                self.load()
-            except FileNotFoundError:
-                print("The file containing the database can't be found. " +
-                      "Therefore, I'm initalizing the database from scratch")
-                self.initialize()
-
-    def connect(self, from_scratch=False):
-        if not from_scratch and not os.path.exists(self.filename):
-            raise FileNotFoundError
-        else:
-            self.conn = sqlite3.connect(self.filename)
-            self.c = self.conn.cursor()
-
-    def initialize(self):
-        try:
-            os.remove(self.filename)
-        except OSError:
-            pass
-        print("Initializing database at {}".format(self.filename))
-        self.connect(from_scratch=True)
-        with self.conn:
-            sql = """
-                CREATE TABLE {} (
-                    {}
-                )
-                """.format(self.movies_table, ', '.join(["{} {}".format(k, v) for k, v in self.columns_movies.items()]))
-            self.c.execute(sql)
-        self.close()
-
-    def load(self):
-        self.connect()
-        try:
-            movies_iterator = self.c.execute("select * from {}".format(self.movies_table))
-        except sqlite3.OperationalError:
-            print("There is something wrong with the database file!")
-            raise
-        self.movies = {movie[0]: self.load_movie(movie) for movie in movies_iterator}
-        self.close()
-        print("database loaded.")
-
-    def load_movie(self, movie_info_tuple):
-        movie_info_dict = {k: movie_info_tuple[i] for i, k in enumerate(self.columns_movies.keys())}
-        return Movie(movie_info_dict)
-
-    def update_record(self, tbl, d, key):
-        self.connect()
-        d = self.make_dict_db_safe(d)
-        sql = "update {} set ".format(tbl)
-        sql += ', '.join([" {} = ? ".format(k) for k in sorted(d)])
-        sql += 'where {} = ?'.format(key)
-        values = tuple([d[k] for k in sorted(d)] + [d[key]])
-        self.c.execute(sql, values)
-        sql = "insert into {} ({}) values ({})".format(
-            tbl, ', '.join([k for k in sorted(d)]), ', '.join(['?' for _ in d])
-        )
-        values = tuple([d[k] for k in sorted(d)])
-        try:
-            self.c.execute(sql, values)
-        except sqlite3.IntegrityError:
-            pass
-        self.close()
-
 
 class MySQLDatabase(Database):
-    def __init__(self, from_scratch=False, schema='qmdb', movies_table='movies'):
+    def __init__(self, from_scratch=False, schema='qmdb'):
         self.schema = schema
         self.columns_movies = {
-            'crit_id': 'mediumint unsigned primary key',
+            'crit_id': 'mediumint unsigned not null',
+            'imdbid': 'int unsigned',
+            'year': 'smallint unsigned',
+            'imdb_year': 'smallint unsigned',
+            'title': 'varchar(256) not null',
+            'imdb_title': 'varchar(256)',
+            'original_title': 'varchar(256)',
+            'crit_rating': 'float',
+            'crit_votes': 'mediumint unsigned',
+            'imdb_rating': 'float',
+            'imdb_votes': 'int unsigned',
+            'metacritic_score': 'smallint unsigned',
+            'kind': 'varchar(64)',
+            'runtime': 'smallint unsigned',
+            'plot_summary': 'varchar(1024)',
+            'plot_storyline': 'varchar(8192)',
+            'original_release_date': 'varchar(32)',
+            'dutch_release_date': 'varchar(32)',
             'crit_popularity_page': 'smallint unsigned not null',
             'crit_url': 'varchar(256) not null',
-            'title': 'varchar(256) not null',
-            'year': 'smallint unsigned',
-            'imdbid': 'mediumint unsigned',
             'tomato_url': 'varchar(256)',
+            'poster_url': 'varchar(256)',
+            'trailer_url': 'varchar(256)',
             'date_added': 'varchar(32) not null',
-            'omdb_updated': 'varchar(32)',
-            'crit_updated': 'varchar(32)'
+            'criticker_updated': 'varchar(32)',
+            'imdb_main_updated': 'varchar(32)',
+            'imdb_release_updated': 'varchar(32)',
+            'imdb_metacritic_updated': 'varchar(32)',
+            'imdb_keywords_updated': 'varchar(32)',
+            'imdb_taglines_updated': 'varchar(32)',
+            'imdb_vote_details_updated': 'varchar(32)',
+            'imdb_plot_updated': 'varchar(32)',
+            'omdb_updated': 'varchar(32)'
         }
-        super().__init__(from_scratch=from_scratch, movies_table=movies_table)
+        self.columns_persons = {
+            'crit_id': 'mediumint unsigned not null',
+            'person_id': 'int unsigned not null',
+            'rank': 'smallint unsigned not null',
+            'name': 'varchar(128)',
+            'canonical_name': 'varchar(128)',
+            'role': 'varchar(32) not null'
+        }
+        self.columns_genres = {
+            'crit_id': 'mediumint unsigned not null',
+            'genre': 'varchar(32) not null'
+        }
+        self.columns_countries = {
+            'crit_id': 'mediumint unsigned not null',
+            'country': 'varchar(64) not null'
+        }
+        self.columns_languages = {
+            'crit_id': 'mediumint unsigned not null',
+            'language': 'varchar(64) not null'
+        }
+        self.columns_keywords = {
+            'crit_id': 'mediumint unsigned not null',
+            'keyword': 'varchar(64) not null'
+        }
+        self.columns_taglines = {
+            'crit_id': 'mediumint unsigned not null',
+            'rank': 'smallint unsigned not null',
+            'tagline': 'varchar(128) not null'
+        }
+        self.columns_vote_details = {
+            'crit_id': 'mediumint unsigned not null',
+            'demographic': 'varchar(64) not null',
+            'votes': 'mediumint not null',
+            'rating': 'float'
+        }
+        super().__init__(from_scratch=from_scratch)
 
     def load_or_initialize(self, from_scratch=False):
         if from_scratch:
@@ -193,36 +151,155 @@ class MySQLDatabase(Database):
                                     password=config.mysql['password'],
                                     db=self.schema,
                                     charset='utf8mb4',
+                                    use_unicode = True,
                                     cursorclass=pymysql.cursors.DictCursor)
         self.c = self.conn.cursor()
 
-    def initialize(self):
-        self.connect()
-        self.c.execute("drop table if exists {}".format(self.movies_table))
-        print("Initializing database")
+    def create_table(self, table_name, column_info, primary_keys, indexes):
+        if not isinstance(primary_keys, list) or len(primary_keys) == 0 or not isinstance(primary_keys[0], str):
+            raise Exception("Something is wrong with the primary keys")
+        if not isinstance(indexes, list) or len(indexes) == 0 or not isinstance(indexes[0], str):
+            raise Exception("Something is wrong with the indexes")
+        self.c.execute("drop table if exists {}".format(table_name))
+        print("Creating table {}.{}".format(self.schema, table_name))
         with self.conn:
             sql = """
                 CREATE TABLE {} (
-                    {}
-                )
-                """.format(self.movies_table, ', '.join(["{} {}".format(k, v) for k, v in self.columns_movies.items()]))
+                    {},
+                    PRIMARY KEY({}), INDEX({})
+                ) DEFAULT CHARSET=utf8mb4
+                """.format(table_name,
+                           ', '.join(["{} {}".format(k, v) for k, v in column_info.items()]),
+                           ', '.join(primary_keys),
+                           '), INDEX('.join(indexes))
             self.c.execute(sql)
+
+    def initialize(self):
+        self.connect()
+        self.create_table('movies', self.columns_movies, ['crit_id'], ['crit_id'])
+        self.create_table('persons', self.columns_persons, ['crit_id', 'person_id', 'role'], ['person_id', 'role'])
+        self.create_table('genres', self.columns_genres, ['crit_id', 'genre'], ['genre'])
+        self.create_table('countries', self.columns_countries, ['crit_id', 'country'], ['country'])
+        self.create_table('languages', self.columns_languages, ['crit_id', 'language'], ['language'])
+        self.create_table('keywords', self.columns_keywords, ['crit_id', 'keyword'], ['keyword'])
+        self.create_table('taglines', self.columns_taglines, ['crit_id', 'rank'], ['rank'])
+        self.create_table('vote_details', self.columns_vote_details, ['crit_id', 'demographic'], ['demographic'])
         self.close()
 
     def load(self, verbose=False):
         self.connect()
-        try:
-            self.c.execute("select * from {}".format(self.movies_table))
-            movies = self.c.fetchall()
-        except pymysql.err.ProgrammingError:
-            print("The movies table does not exist!")
-            raise
-        self.movies = {movie['crit_id']: Movie(movie) for movie in movies}
+        movies = self.load_movies()
+        self.load_persons(movies)
+        self.load_genres(movies)
+        self.load_countries(movies)
+        self.load_languages(movies)
+        self.load_keywords(movies)
+        self.load_taglines(movies)
+        self.load_vote_details(movies)
+        self.everything_to_movie(movies)
         self.close()
         if verbose:
             print("database loaded.")
 
-    def update_record(self, tbl, d, key):
+    def load_table(self, tbl):
+        try:
+            self.c.execute("select * from {}".format(tbl))
+        except pymysql.err.ProgrammingError:
+            print("The {} table does not exist!".format(tbl))
+            raise
+        return self.c.fetchall()
+
+    def load_movies(self):
+        movies = self.load_table('movies')
+        return {movie['crit_id']: movie for movie in movies}
+
+    def load_persons(self, movies):
+        persons = self.load_table('persons')
+        cast = [person for person in persons if person['role'] == 'cast']
+        cast_dict = {k: {'cast': [{'canonical_name': e['canonical_name'],
+                                   'name': e['name'],
+                                   'person_id': e['person_id']}
+                                  for e in list(v)]}
+                     for k, v in groupby(cast, key=lambda x: x['crit_id'])}
+        for k, v in cast_dict.items():
+            movies[k].update(v)
+        directors = [person for person in persons if person['role'] == 'director']
+        directors_dict = {k: {'directors': [{'canonical_name': e['canonical_name'],
+                                             'name': e['name'],
+                                             'person_id': e['person_id']}
+                                  for e in list(v)]}
+                          for k, v in groupby(directors, key=lambda x: x['crit_id'])}
+        for k, v in directors_dict.items():
+            movies[k].update(v)
+        writers = [person for person in persons if person['role'] == 'writer']
+        writers_dict = {k: {'cast': [{'canonical_name': e['canonical_name'],
+                                      'name': e['name'],
+                                      'person_id': e['person_id']}
+                                     for e in list(v)]}
+                        for k, v in groupby(writers, key=lambda x: x['crit_id'])}
+        for k, v in writers_dict.items():
+            movies[k].update(v)
+
+    def load_genres(self, movies):
+        genres = self.load_table('genres')
+        genre_dict = {k: {'genres': {e['genre'] for e in list(v)}}
+                      for k, v in groupby(genres, key=lambda x: x['crit_id'])}
+        for k, v in genre_dict.items():
+            movies[k].update(v)
+
+    def load_countries(self, movies):
+        countries = self.load_table('countries')
+        country_dict = {k: {'countries': {e['country'] for e in list(v)}}
+                        for k, v in groupby(countries, key=lambda x: x['crit_id'])}
+        for k, v in country_dict.items():
+            movies[k].update(v)
+
+    def load_languages(self, movies):
+        languages = self.load_table('languages')
+        language_dict = {k: {'languages': {e['language'] for e in list(v)}}
+                        for k, v in groupby(languages, key=lambda x: x['crit_id'])}
+        for k, v in language_dict.items():
+            movies[k].update(v)
+
+    def load_keywords(self, movies):
+        keywords = self.load_table('keywords')
+        keyword_dict = {k: {'keywords': {e['keyword'] for e in list(v)}}
+                        for k, v in groupby(keywords, key=lambda x: x['crit_id'])}
+        for k, v in keyword_dict.items():
+            movies[k].update(v)
+
+    def load_taglines(self, movies):
+        taglines = self.load_table('taglines')
+        taglines_dict = {k: {'taglines': [{'tagline': e['tagline'],
+                                           'id': e['rank']}
+                                          for e in list(v)]}
+                         for k, v in groupby(taglines, key=lambda x: x['crit_id'])}
+        for k, v in taglines_dict.items():
+            movies[k].update(v)
+
+    def load_vote_details(self, movies):
+        vote_details = self.load_table('vote_details')
+        vote_details_dict = {k: {'vote_details': {e['demographic']: {'rating': e['rating'], 'votes': e['votes']}
+                                                  for e in list(v)}}
+                             for k, v in groupby(vote_details, key=lambda x: x['crit_id'])}
+        for k, v in vote_details_dict.items():
+            movies[k].update(v)
+
+    def everything_to_movie(self, movies):
+        for movie in movies.values():
+            self.movies[movie['crit_id']] = Movie(movie)
+
+    def set_movie(self, movie):
+        self.update_single_record('movies', self.movie_to_dict_movies(movie))
+        self.update_multiple_records('persons', self.movie_to_dict_persons(movie))
+        self.update_multiple_records('genres', self.movie_to_dict_genres(movie))
+        self.update_multiple_records('countries', self.movie_to_dict_countries(movie))
+        self.update_multiple_records('languages', self.movie_to_dict_languages(movie))
+        self.update_multiple_records('keywords', self.movie_to_dict_keywords(movie))
+        self.update_multiple_records('taglines', self.movie_to_dict_taglines(movie))
+        self.update_multiple_records('vote_details', self.movie_to_dict_vote_details(movie))
+
+    def update_single_record(self, tbl, d):
         self.connect()
         d = self.make_dict_db_safe(d)
         sql = "insert into {} (".format(tbl)
@@ -235,10 +312,174 @@ class MySQLDatabase(Database):
         self.c.execute(sql, values)
         self.close()
 
+    def create_insert_multiple_records_sql(self, tbl, d):
+        keys = [key for key in list(d.keys()) if key not in ['crit_id', 'n_rows']]
+        sql = "insert into {} (crit_id, {}) values ".format(tbl, ', '.join(keys))
+        rows = []
+        for i in range(d['n_rows']):
+            rows.append("(%s, " + ', '.join(["%s" for _ in keys]) + ")")
+        sql += ', '.join(rows)
+        values = []
+        for i in range(d['n_rows']):
+            values += [d['crit_id']] + [d[key][i] for key in keys]
+        return sql, values
+
+    def update_multiple_records(self, tbl, d):
+        if d['n_rows'] > 0:
+            self.connect()
+            # Delete existing rows
+            sql = "delete from {} where crit_id = %s".format(tbl)
+            values = [d['crit_id']]
+            self.c.execute(sql, values)
+            self.conn.commit()
+            # Add new rows
+            sql, values = self.create_insert_multiple_records_sql(tbl, d)
+            self.c.execute(sql, values)
+            self.close()
+
     def remove_table(self, table_name='movies'):
         self.connect()
         self.c.execute("drop table if exists {}".format(table_name))
         self.close()
+
+    def add_column(self, column_name, column_datatype, table_name='movies', after=None):
+        self.connect()
+        sql = "alter table {} add column {} {}".format(table_name, column_name, column_datatype)
+        if after is not None:
+            sql += " after {}".format(after)
+        try:
+            self.c.execute(sql)
+        except pymysql.err.InternalError as e:
+            if not e.args[0] == 1060:
+                print(e)
+                raise Exception
+            else:
+                print("{} already in table {}".format(e.args[1], table_name))
+        finally:
+            self.close()
+
+    def add_columns(self, columns, table_name='movies'):
+        if isinstance(table_name, str):
+            for column in columns:
+                self.add_column(column['column_name'], column['column_datatype'],
+                                table_name=table_name, after=column.get('after'))
+        elif isinstance(table_name, list):
+            for table in table_name:
+                for column in columns:
+                    self.add_column(column['column_name'], column['column_datatype'],
+                                    table_name=table, after=column.get('after'))
+        else:
+            raise Exception
+
+    def movie_to_dict_movies(self, movie):
+        d = {k: v for k, v in vars(movie).items()
+             if v is not None and k in self.columns_movies.keys()}
+        return d
+
+    @staticmethod
+    def process_persons(person_dict, persons, role):
+        person_ids = [person['person_id'] for person in persons]
+        canonical_names = [person['canonical_name'] for person in persons]
+        names = [person['name'] for person in persons]
+        ranks = [i + 1 for i, person in enumerate(persons)]
+        roles = [role for _ in persons]
+        person_dict['person_id'] += person_ids
+        person_dict['canonical_name'] += canonical_names
+        person_dict['name'] += names
+        person_dict['rank'] += ranks
+        person_dict['role'] += roles
+
+    def movie_to_dict_persons(self, movie):
+        person_dict = {'crit_id': movie.crit_id,
+                       'n_rows': 0,
+                       'person_id': list(),
+                       'canonical_name': list(),
+                       'name': list(),
+                       'rank': list(),
+                       'role': list()}
+        cast = movie.cast
+        if cast is not None:
+            self.process_persons(person_dict, cast, 'cast')
+        directors = movie.director
+        if directors is not None:
+            self.process_persons(person_dict, directors, 'director')
+        writers = movie.writer
+        if writers is not None:
+            self.process_persons(person_dict, writers, 'writer')
+        person_dict['n_rows'] = len(person_dict['person_id'])
+        return person_dict
+
+    @staticmethod
+    def movie_to_dict_genres(movie):
+        genres_dict = {'crit_id': movie.crit_id,
+                       'n_rows': 0,
+                       'genre': list()}
+        genres = movie.genres
+        if genres is not None:
+            genres_dict['genre'] = list(genres)
+            genres_dict['n_rows'] = len(genres)
+        return genres_dict
+
+    @staticmethod
+    def movie_to_dict_countries(movie):
+        countries_dict = {'crit_id': movie.crit_id,
+                          'n_rows': 0,
+                          'country': list()}
+        countries = movie.countries
+        if countries is not None:
+            countries_dict['country'] = list(countries)
+            countries_dict['n_rows'] = len(countries)
+        return countries_dict
+
+    @staticmethod
+    def movie_to_dict_languages(movie):
+        languages_dict = {'crit_id': movie.crit_id,
+                          'n_rows': 0,
+                          'language': list()}
+        languages = movie.languages
+        if languages is not None:
+            languages_dict['language'] = list(languages)
+            languages_dict['n_rows'] = len(languages)
+        return languages_dict
+
+    @staticmethod
+    def movie_to_dict_keywords(movie):
+        keywords_dict = {'crit_id': movie.crit_id,
+                         'n_rows': 0,
+                         'keyword': list()}
+        keywords = movie.keywords
+        if keywords is not None:
+            keywords_dict['keyword'] = list(keywords)
+            keywords_dict['n_rows'] = len(keywords)
+        return keywords_dict
+
+    @staticmethod
+    def movie_to_dict_taglines(movie):
+        taglines_dict = {'crit_id': movie.crit_id,
+                         'n_rows': 0,
+                         'rank': list(),
+                         'tagline': list()}
+        taglines = movie.taglines
+        if taglines is not None:
+            taglines_dict['tagline'] = list(taglines)
+            taglines_dict['rank'] = list(range(1, len(taglines)+1))
+            taglines_dict['n_rows'] = len(taglines)
+        return taglines_dict
+
+    @staticmethod
+    def movie_to_dict_vote_details(movie):
+        vote_details_dict = {'crit_id': movie.crit_id,
+                             'n_rows': 0,
+                             'demographic': list(),
+                             'rating': list(),
+                             'votes': list()}
+        vote_details = movie.vote_details
+        if vote_details is not None:
+            vote_details_dict['demographic'] = list(vote_details.keys())
+            vote_details_dict['rating'] = [vote_details[demog]['rating'] for demog in vote_details]
+            vote_details_dict['votes'] = [vote_details[demog]['votes'] for demog in vote_details]
+            vote_details_dict['n_rows'] = len(vote_details.keys())
+        return vote_details_dict
 
 
 class MovieNotInDatabaseError(Exception):

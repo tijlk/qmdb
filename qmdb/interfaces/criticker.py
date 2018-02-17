@@ -1,16 +1,13 @@
-import json
+import re
+import time
 
 import arrow
 import requests
+from bs4 import BeautifulSoup
 from requests import ConnectionError
 
-from qmdb.interfaces.interfaces import Scraper
-from qmdb.movie.movie import Movie
-from bs4 import BeautifulSoup
-import re
-import time
 from qmdb.config import config
-import numpy as np
+from qmdb.interfaces.interfaces import Scraper
 
 
 banned_movies = {154: 'Apocalypse Now Redux'}
@@ -22,12 +19,11 @@ class CritickerScraper(Scraper):
 
     def refresh_movie(self, movie):
         super().refresh_movie(movie)
-        try:
-            movie_info = self.get_movie_info(movie.crit_url)
-            if isinstance(movie_info, dict):
-                movie.update_from_dict(movie_info)
+        movie_info = self.get_movie_info(movie.crit_url)
+        if isinstance(movie_info, dict):
+            movie.update_from_dict(movie_info)
             return movie
-        except:
+        else:
             return None
 
     def get_movie_info(self, crit_url):
@@ -38,9 +34,46 @@ class CritickerScraper(Scraper):
             print("Could not connect to Criticker or criticker URL invalid.")
             return None
         soup = BeautifulSoup(r.text, "lxml")
-        imdb_url = soup.find('p', attrs={'class': 'fi_extrainfo', 'id': 'fi_info_ext'}).find('a').get('href')
-        imdbid = int(re.match(r'.+tt(\d{7})\/', imdb_url).groups()[0])
-        return {'imdbid': imdbid, 'crit_updated': arrow.now()}
+        try:
+            poster_url = soup.find('meta', attrs={'itemprop': 'image'}).get('content')
+            if poster_url == '':
+                poster_url = None
+        except AttributeError:
+            poster_url = None
+        try:
+            my_rating = int(soup.find('div', attrs={'class': 'fi_score_div'}).text)
+        except AttributeError:
+            my_rating = None
+        try:
+            trailer_url_id = re.search(r'.*youtube.*\/([a-zA-Z0-9]+)$',
+                                       soup.find('div', attrs={'id': 'fi_trailer'})
+                                           .find('iframe').get('src')).groups()[0]
+        except AttributeError:
+            trailer_url = None
+        else:
+            trailer_url = 'https://www.youtube.com/watch?v={}'.format(trailer_url_id)
+        try:
+            imdb_url = soup.find('p', attrs={'class': 'fi_extrainfo', 'id': 'fi_info_ext'}).find('a').get('href')
+        except AttributeError:
+            imdbid = None
+        else:
+            imdbid = int(re.match(r'.+tt(\d{7})\/', imdb_url).groups()[0])
+        try:
+            crit_rating = float(soup.find('span', attrs={'itemprop': 'ratingValue'}).text)
+        except AttributeError:
+            crit_rating = None
+        try:
+            crit_votes = int(soup.find('span', attrs={'itemprop': 'reviewCount'}).text)
+        except AttributeError:
+            crit_votes = 0
+
+        return {'imdbid': imdbid,
+                'criticker_updated': arrow.now(),
+                'poster_url': poster_url,
+                'my_rating': my_rating,
+                'trailer_url': trailer_url,
+                'crit_rating': crit_rating,
+                'crit_votes': crit_votes}
 
     @staticmethod
     def get_year_from_movielist_title(title):
@@ -81,8 +114,12 @@ class CritickerScraper(Scraper):
             print("Could not connect to Criticker.")
             return None
         soup = BeautifulSoup(r.text, "lxml")
-        movie_list = soup.find('ul', attrs={'class': 'fl_titlelist'})\
+        try:
+            movie_list = soup.find('ul', attrs={'class': 'fl_titlelist'})\
                          .find_all('li', attrs={'id': re.compile(r'fl_titlelist_title_\d+')})
+        except AttributeError:
+            print("Couldn't process movies on page {}.".format(pagenr))
+            return [], None
         movies = [self.get_movielist_movie_attributes(h, crit_popularity_page=pagenr) for h in movie_list]
         movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
         nr_pages_text = str(next(soup.find('p', attrs={'id': 'fl_nav_pagenums_page'}).children))
