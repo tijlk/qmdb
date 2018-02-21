@@ -116,8 +116,8 @@ class Movie(object):
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
         self.vote_details = self.replace_if_not_none(movie_info.get('vote_details'), self.vote_details)
         self.crit_myratings = self.update_if_not_none(movie_info.get('crit_myratings'), self.crit_myratings)
-        self.date_added = self.replace_if_not_none(self.str_to_arrow(movie_info.get('date_added')),
-                                                   self.date_added)
+        self.date_added = self.update_if_not_none(self.str_to_arrow(movie_info.get('date_added')),
+                                                  self.date_added)
         self.criticker_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('criticker_updated')),
                                                           self.criticker_updated)
         self.imdb_main_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('imdb_main_updated')),

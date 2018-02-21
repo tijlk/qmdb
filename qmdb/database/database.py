@@ -504,7 +504,7 @@ class MySQLDatabase(Database):
         ratings = movie.crit_myratings
         if ratings is not None:
             ratings_dict['user'] = list(ratings.keys())
-            ratings_dict['rating'] = [rating['rating'] for rating in ratings]
+            ratings_dict['rating'] = [ratings[user] for user in ratings]
         return ratings_dict
 
 

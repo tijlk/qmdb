@@ -30,7 +30,6 @@ class CritickerScraper(Scraper):
     def get_movie_info(self, crit_url):
         try:
             r = requests.get(crit_url, cookies=self.cookies)
-            time.sleep(1)
         except ConnectionError:
             print("Could not connect to Criticker or criticker URL invalid.")
             return None
@@ -100,13 +99,13 @@ class CritickerScraper(Scraper):
         movie_info = {'crit_id': id,
                       'crit_url': url,
                       'title': title,
-                      'year': year}
+                      'year': year,
+                      'date_added': arrow.now()}
         if popularity is not None and pagenr is not None and nr_pages is not None:
-            movie_info.update({'crit_popularity': popularity - (pagenr - 1)/(nr_pages - 1),
-                               'date_added': arrow.now()})
+            movie_info.update({'crit_popularity': popularity - (pagenr - 1)/(nr_pages - 1)})
         try:
             rating = {self.user: int(movie_html.find('div', attrs={'title': 'Your Ranking'}).text)}
-        except TypeError:
+        except AttributeError:
             rating = None
         if rating is not None:
             movie_info.update({'crit_myratings': rating})
@@ -116,7 +115,7 @@ class CritickerScraper(Scraper):
     def get_movie_list_html(url, cookies=None):
         try:
             r = requests.get(url, cookies=cookies)
-            time.sleep(2)
+            time.sleep(1)
         except ConnectionError:
             print("Could not connect to Criticker.")
             return None
@@ -179,6 +178,7 @@ class CritickerScraper(Scraper):
     def get_ratings_page(self, pagenr=1):
         criticker_url = 'https://www.criticker.com/rankings/?p={}'.format(pagenr)
         movie_list, nr_pages = self.get_movie_list_html(criticker_url, cookies=self.cookies)
+        print("Downloading ratings from Criticker, page {} of {}.".format(pagenr, nr_pages))
         movies = [self.get_movielist_movie_attributes(h) for h in movie_list]
         movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
         return movies, nr_pages
