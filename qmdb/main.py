@@ -25,8 +25,8 @@ if __name__ == "__main__":
     omdb_scraper = OMDBScraper()
     crit_scraper = CritickerScraper(user='tijl')
     updater = Updater()
-    #get_criticker_movies(db, crit_scraper, start_popularity=8)
-    get_criticker_ratings(db, crit_scraper)
+    get_criticker_movies(db, crit_scraper, start_popularity=8)
+    #get_criticker_ratings(db, crit_scraper)
 
     print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")
     while True:
