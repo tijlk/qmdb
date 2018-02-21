@@ -186,5 +186,6 @@ class CritickerScraper(Scraper):
     def get_ratings(self):
         movies, nr_pages = self.get_ratings_page()
         for pagenr in range(2, nr_pages+1):
-            movies += self.get_ratings_page(pagenr=pagenr)
+            new_movies, _ = self.get_ratings_page(pagenr=pagenr)
+            movies += new_movies
         return movies
