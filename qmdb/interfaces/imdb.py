@@ -20,7 +20,7 @@ class IMDBScraper(Scraper):
         super().refresh_movie(movie)
         imdbid = '%07d' % int(movie.imdbid)
         if isinstance(infoset, str):
-            infoset = ['main']
+            infoset = [infoset]
         for info in infoset:
             get_info = getattr(self, 'process_' + info + '_info')
             movie_info = get_info(imdbid)
@@ -63,17 +63,25 @@ class IMDBScraper(Scraper):
             info['writer'] = [self.person_to_dict(person) for person in writers]
             info['writer'] = [e for e in info['writer'] if e is not None]
             info['writer'] = self.remove_duplicate_dicts(info['writer'])
-        info['genres'] = set(main_info.get('genres'))
+        info['genres'] = None if main_info.get('genres') is None else set(main_info.get('genres'))
         runtimes = main_info.get('runtimes')
         if runtimes is not None:
             info['runtime'] = int(round(np.median([int(runtime) for runtime in main_info['runtimes']])))
-        info['countries'] = set(main_info.get('countries'))
+        info['countries'] = None if main_info.get('countries') is None else set(main_info.get('countries'))
         info['imdb_rating'] = main_info.get('rating')
-        info['imdb_votes'] = main_info.get('votes')
+        info['imdb_votes'] = self.parse_imdb_votes(main_info.get('votes'))
         info['plot_storyline'] = main_info.get('plot outline')
-        info['languages'] = set(main_info.get('languages'))
+        info['languages'] = None if main_info.get('languages') is None else set(main_info.get('languages'))
         info['imdb_main_updated'] = arrow.now()
         return info
+
+    @staticmethod
+    def parse_imdb_votes(votes):
+        try:
+            votes = int(votes)
+        except TypeError:
+            votes = None
+        return votes
 
     @staticmethod
     def process_release_date(reldate_str):

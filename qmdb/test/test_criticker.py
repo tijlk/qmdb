@@ -25,9 +25,10 @@ def test_cookies_work():
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
 def test_get_criticker_movie_list_page():
     pagenr = 2
-    min_popularity = 3
+    popularity = 3
+    min_year = 2000
     criticker_scraper = CritickerScraper()
-    movies, nr_pages = criticker_scraper.get_movie_list_page(pagenr=pagenr, min_popularity=min_popularity)
+    movies, nr_pages = criticker_scraper.get_movie_list_popularity_page(pagenr=pagenr, popularity=popularity, min_year=min_year)
     assert len(movies) == 60
     assert isinstance(movies[0], dict)
     assert isinstance(movies[0]['date_added'], arrow.Arrow)
@@ -35,12 +36,13 @@ def test_get_criticker_movie_list_page():
 
 
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-def test_get_criticker_movie_list():
-    min_popularity = 10
+def test_get_criticker_movie_list(mocker):
+    # TODO: improve this test. Why is mocker not working????
+    mocker.patch.object(CritickerScraper, 'get_movies_of_popularity', lambda *args, **kwargs: [1]*120)
+    start_popularity = 1
     criticker_scraper = CritickerScraper()
-    movies = criticker_scraper.get_movies(min_popularity=min_popularity, debug=True)
-    assert len(movies) > 60
-    assert len(set([movie['crit_id'] for movie in movies])) == 120
+    movies = criticker_scraper.get_movies(start_popularity=start_popularity)
+    assert len(movies) == 1200
 
 
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
@@ -128,16 +130,16 @@ def test_get_year_from_movielist_title():
 
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
 def test_add_criticker_movies_to_db():
-    min_popularity = 10
+    start_popularity = 8
     criticker_scraper = CritickerScraper()
-    movies = criticker_scraper.get_movies(min_popularity=min_popularity, debug=True)
+    movies = criticker_scraper.get_movies(start_popularity=start_popularity, debug=True)
     db = MySQLDatabase(schema='qmdb_test', from_scratch=True)
     for movie in movies:
         db.set_movie(Movie(movie))
     db = MySQLDatabase(schema='qmdb_test')
-    assert 1129 in db.movies
-    assert db.movies[1129].title == 'Forrest Gump'
-    assert db.movies[1129].year == 1994
-    assert db.movies[1129].crit_url == 'https://www.criticker.com/film/Forrest-Gump/'
+    assert 98304 in db.movies
+    assert db.movies[98304].title == 'Interstellar'
+    assert db.movies[98304].year == 2014
+    assert db.movies[98304].crit_url == 'https://www.criticker.com/film/Interstellar/'
     remove_test_tables(db)
 

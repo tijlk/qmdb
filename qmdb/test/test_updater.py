@@ -23,7 +23,7 @@ def test_get_movies_stats():
     updater = Updater()
     updater.get_movies_stats(db)
     print(updater.years)
-    print(updater.crit_pop_pages)
+    print(updater.crit_pop)
     movie = db.movies[49141]
     print(humanized_time(movie.date_added), humanized_time(movie.criticker_updated), humanized_time(movie.omdb_updated))
     updates = updater.calculate_next_updates(movie)
@@ -49,13 +49,13 @@ def test_parameters():
 
 def test_calculate_final_period():
     updater = Updater()
-    update_period = updater.calculate_update_period(10, 15, year_power=1, crit_pop_pages_power=1)
+    update_period = updater.calculate_update_period(10, 15, year_power=1, crit_pop_power=1)
     assert update_period == pytest.approx(12.2474, 0.01)
     update_period = updater.calculate_update_period(10, 10)
     assert update_period == pytest.approx(10, 0.01)
-    update_period = updater.calculate_update_period(10, 200, crit_pop_pages_power=0)
+    update_period = updater.calculate_update_period(10, 200, crit_pop_power=0)
     assert update_period == pytest.approx(10, 0.01)
-    update_period = updater.calculate_update_period(10, 200, crit_pop_pages_power=1/100)
+    update_period = updater.calculate_update_period(10, 200, crit_pop_power=1/100)
     assert update_period == pytest.approx(10.3010, 0.01)
 
 
@@ -85,8 +85,8 @@ def test_get_update_sequence():
     assert len(seq) == 43
     for e in seq:
         assert isinstance(e, dict)
-    assert len([e for e in seq if e['source'] == 'criticker']) == 5
-    assert len([e for e in seq if e['source'] == 'omdb']) == 3
+    assert len([e for e in seq if e['source'] == 'criticker']) == 6
+    assert len([e for e in seq if e['source'] == 'omdb']) == 2
     remove_test_tables(db)
 
 

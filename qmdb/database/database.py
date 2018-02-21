@@ -8,6 +8,7 @@ from qmdb.config import config
 import pymysql.cursors
 from itertools import groupby
 
+
 class Database:
     def __init__(self, from_scratch=False):
         self.movies = {}
@@ -34,7 +35,6 @@ class Database:
     def load(self):
         raise NotImplementedError
 
-
     def get_movie(self, crit_id):
         try:
             return self.movies[crit_id]
@@ -44,7 +44,7 @@ class Database:
 
     def print(self):
         movies = sorted(list(self.movies.values()),
-                        key=lambda x: max(arrow.get('1970-01-01') if x.crit_updated is None else x.crit_updated,
+                        key=lambda x: max(arrow.get('1970-01-01') if x.criticker_updated is None else x.criticker_updated,
                                           arrow.get('1970-01-01') if x.omdb_updated is None else x.omdb_updated),
                         reverse=True)
         for movie in movies[:10]:
@@ -81,7 +81,7 @@ class MySQLDatabase(Database):
             'plot_storyline': 'varchar(8192)',
             'original_release_date': 'varchar(32)',
             'dutch_release_date': 'varchar(32)',
-            'crit_popularity_page': 'smallint unsigned not null',
+            'crit_popularity': 'float',
             'crit_url': 'varchar(256) not null',
             'tomato_url': 'varchar(256)',
             'poster_url': 'varchar(256)',
@@ -101,8 +101,8 @@ class MySQLDatabase(Database):
             'crit_id': 'mediumint unsigned not null',
             'person_id': 'int unsigned not null',
             'rank': 'smallint unsigned not null',
-            'name': 'varchar(128)',
-            'canonical_name': 'varchar(128)',
+            'name': 'varchar(256)',
+            'canonical_name': 'varchar(256)',
             'role': 'varchar(32) not null'
         }
         self.columns_genres = {
@@ -132,6 +132,11 @@ class MySQLDatabase(Database):
             'votes': 'mediumint not null',
             'rating': 'float'
         }
+        self.columns_ratings = {
+            'crit_id': 'mediumint unsigned not null',
+            'user': 'varchar(64) not null',
+            'rating': 'smallint not null'
+        }
         super().__init__(from_scratch=from_scratch)
 
     def load_or_initialize(self, from_scratch=False):
@@ -141,9 +146,8 @@ class MySQLDatabase(Database):
             try:
                 self.load()
             except pymysql.err.ProgrammingError:
-                print("The movies table does not exist yet. " +
-                      "Therefore, I'm initalizing the table from scratch")
-                self.initialize()
+                print("Something went wrong trying to load the tables.")
+                raise Exception
 
     def connect(self, from_scratch=False):
         self.conn = pymysql.connect(host=config.mysql['host'],
@@ -184,6 +188,7 @@ class MySQLDatabase(Database):
         self.create_table('keywords', self.columns_keywords, ['crit_id', 'keyword'], ['keyword'])
         self.create_table('taglines', self.columns_taglines, ['crit_id', 'rank'], ['rank'])
         self.create_table('vote_details', self.columns_vote_details, ['crit_id', 'demographic'], ['demographic'])
+        self.create_table('ratings', self.columns_ratings, ['crit_id', 'user'], ['user'])
         self.close()
 
     def load(self, verbose=False):
@@ -196,6 +201,7 @@ class MySQLDatabase(Database):
         self.load_keywords(movies)
         self.load_taglines(movies)
         self.load_vote_details(movies)
+        self.load_ratings(movies)
         self.everything_to_movie(movies)
         self.close()
         if verbose:
@@ -285,6 +291,13 @@ class MySQLDatabase(Database):
         for k, v in vote_details_dict.items():
             movies[k].update(v)
 
+    def load_ratings(self, movies):
+        ratings = self.load_table('ratings')
+        ratings_dict = {k: {'ratings': {e['user']: e['rating'] for e in list(v)}}
+                        for k, v in groupby(ratings, key=lambda x: x['crit_id'])}
+        for k, v in ratings_dict.items():
+            movies[k].update(v)
+
     def everything_to_movie(self, movies):
         for movie in movies.values():
             self.movies[movie['crit_id']] = Movie(movie)
@@ -297,6 +310,7 @@ class MySQLDatabase(Database):
         self.update_multiple_records('languages', self.movie_to_dict_languages(movie))
         self.update_multiple_records('keywords', self.movie_to_dict_keywords(movie))
         self.update_multiple_records('taglines', self.movie_to_dict_taglines(movie))
+        self.update_multiple_records('ratings', self.movie_to_dict_ratings(movie))
         self.update_multiple_records('vote_details', self.movie_to_dict_vote_details(movie))
 
     def update_single_record(self, tbl, d):
@@ -480,6 +494,18 @@ class MySQLDatabase(Database):
             vote_details_dict['votes'] = [vote_details[demog]['votes'] for demog in vote_details]
             vote_details_dict['n_rows'] = len(vote_details.keys())
         return vote_details_dict
+
+    @staticmethod
+    def movie_to_dict_ratings(movie):
+        ratings_dict = {'crit_id': movie.crit_id,
+                        'n_rows': 0,
+                        'user': list(),
+                        'rating': list()}
+        ratings = movie.crit_myratings
+        if ratings is not None:
+            ratings_dict['user'] = list(ratings.keys())
+            ratings_dict['rating'] = [rating['rating'] for rating in ratings]
+        return ratings_dict
 
 
 class MovieNotInDatabaseError(Exception):

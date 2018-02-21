@@ -7,6 +7,7 @@ import arrow
 import time
 from qmdb.movie.utils import humanized_time
 import re
+from qmdb.movie.movie import Movie
 
 
 class Updater(object):
@@ -35,7 +36,7 @@ class Updater(object):
         self.omdb_scraper = OMDBScraper()
         self.imdb_scraper = IMDBScraper()
         self.years = None
-        self.crit_pop_pages = None
+        self.crit_pop = None
         self.earliest_date_added = None
         self.max_connections_per_hour = {'criticker': 250,
                                          'omdb': 40,
@@ -55,10 +56,10 @@ class Updater(object):
         for i, source_to_update in enumerate(sources_to_update):
             time_to_sleep = max(1, (source_to_update['next_update'] - arrow.now()).total_seconds())
             last_updated = getattr(db.movies[source_to_update['crit_id']], source_to_update['source'] + '_updated')
-            print("{}: Updating {} info for '{}' ({}, page {}) {}. Last updated {}.".format(
-                arrow.now().format(), source_to_update['source'], db.movies[source_to_update['crit_id']].title,
+            print("{}: Updating {} info for '{}' ({}, popularity {:.1f}) {}. Last updated {}.".format(
+                arrow.now().format('HH:mm:ss'), source_to_update['source'], db.movies[source_to_update['crit_id']].title,
                 db.movies[source_to_update['crit_id']].year,
-                db.movies[source_to_update['crit_id']].crit_popularity_page,
+                db.movies[source_to_update['crit_id']].crit_popularity,
                 arrow.now().shift(seconds=time_to_sleep).humanize(),
                 humanized_time(last_updated)))
             time.sleep(time_to_sleep)
@@ -72,16 +73,17 @@ class Updater(object):
                  'max': np.max(years_numbers)}
         years['b_parameter'] = self.b_parameter(years['max'] - years['median'], years['max'] - years['min'])
         years['a_parameter'] = self.a_parameter(years['max'] - years['median'], years['b_parameter'])
-        crit_pop_pages_nrs = [db.movies[crit_id].crit_popularity_page for crit_id in db.movies]
-        crit_pop_pages = {'min': np.min(crit_pop_pages_nrs),
-                          'median': np.median(crit_pop_pages_nrs),
-                          'max': np.max(crit_pop_pages_nrs)}
-        crit_pop_pages['b_parameter'] = self.b_parameter(crit_pop_pages['median'] - crit_pop_pages['min'],
-                                                         crit_pop_pages['max'] - crit_pop_pages['min'])
-        crit_pop_pages['a_parameter'] = self.a_parameter(crit_pop_pages['median'] - crit_pop_pages['min'],
-                                                         crit_pop_pages['b_parameter'])
+        crit_pop_nrs = [db.movies[crit_id].crit_popularity for crit_id in db.movies
+                        if db.movies[crit_id].crit_popularity is not None]
+        crit_pop = {'min': np.min(crit_pop_nrs),
+                    'median': np.median(crit_pop_nrs),
+                    'max': np.max(crit_pop_nrs)}
+        crit_pop['b_parameter'] = self.b_parameter(crit_pop['max'] - crit_pop['median'],
+                                                   crit_pop['max'] - crit_pop['min'])
+        crit_pop['a_parameter'] = self.a_parameter(crit_pop['max'] - crit_pop['median'],
+                                                   crit_pop['b_parameter'])
         self.years = years
-        self.crit_pop_pages = crit_pop_pages
+        self.crit_pop = crit_pop
         self.earliest_date_added = np.min([db.movies[crit_id].date_added for crit_id in db.movies])
 
     @staticmethod
@@ -103,9 +105,9 @@ class Updater(object):
 
     def calculate_next_updates(self, movie, weibull_lambda=1.5):
         year_period_score = self.calculate_period_score(self.years['max'] - movie.year, self.years)
-        crit_pop_pages_period_score = self.calculate_period_score(
-            movie.crit_popularity_page - self.crit_pop_pages['min'], self.crit_pop_pages)
-        base_update_period = self.calculate_update_period(year_period_score, crit_pop_pages_period_score)
+        crit_popularity = self.crit_pop['median'] if movie.crit_popularity is None else movie.crit_popularity
+        crit_pop_period_score = self.calculate_period_score(self.crit_pop['max'] - crit_popularity, self.crit_pop)
+        base_update_period = self.calculate_update_period(year_period_score, crit_pop_period_score)
 
         update_periods = {}
         for source in self.sources:
@@ -130,11 +132,12 @@ class Updater(object):
         return np.exp(stats['a_parameter']*np.power(feature, stats['b_parameter']))
 
     @staticmethod
-    def calculate_update_period(year_period_score, crit_pop_pages_period_score, year_power=1,
-                                crit_pop_pages_power=1):
-        return np.exp((year_power * np.log(year_period_score) +
-                       crit_pop_pages_power * np.log(crit_pop_pages_period_score)) /
-                      (year_power + crit_pop_pages_power))
+    def calculate_update_period(year_period_score, crit_pop_period_score, year_power=1,
+                                crit_pop_power=1):
+        period = np.exp((year_power * np.log(year_period_score) +
+                       crit_pop_power * np.log(crit_pop_period_score)) /
+                      (year_power + crit_pop_power))
+        return period
 
     def calculate_next_update(self, date_updated, period, firsttime_period, weibull_lambda=1.5, min_period=500):
         weibull = (np.random.weibull(weibull_lambda, 1) / np.power(np.log(2), 1 / weibull_lambda))[0]
@@ -168,5 +171,13 @@ class Updater(object):
         elif source_to_update['source'].startswith('imdb'):
             infoset = re.search(r'imdb_(.*)', source_to_update['source']).groups()[0]
             movie = self.imdb_scraper.refresh_movie(movie, infoset=infoset)
+        if movie is not None:
+            db.set_movie(movie)
+
+    def update_movie_completely(self, db, imdbid):
+        movie = [db.movies[crit_id] for crit_id in db.movies if db.movies[crit_id].imdbid == imdbid][0]
+        movie = self.crit_scraper.refresh_movie(movie)
+        movie = self.omdb_scraper.refresh_movie(movie)
+        movie = self.imdb_scraper.refresh_movie(movie, infoset='main')
         if movie is not None:
             db.set_movie(movie)

@@ -5,7 +5,7 @@ import arrow
 class Movie(object):
     def __init__(self, movie_info):
         self.crit_id = None
-        self.crit_popularity_page = None
+        self.crit_popularity = None
         self.crit_url = None
         self.title = None
         self.year = None
@@ -46,6 +46,7 @@ class Movie(object):
         self.imdb_vote_details_updated = None
         self.imdb_plot_updated = None
         self.omdb_updated = None
+        self.crit_myratings = None
         self.update_from_dict(movie_info)
 
     def print(self):
@@ -55,6 +56,14 @@ class Movie(object):
     @staticmethod
     def replace_if_not_none(new_value, old_value):
         return new_value if new_value is not None else old_value
+
+    @staticmethod
+    def update_if_not_none(new_value, old_value):
+        if old_value is None:
+            return new_value
+        else:
+            assert isinstance(old_value, dict)
+            return old_value.update(new_value) if new_value is not None else old_value
 
     @staticmethod
     def str_to_arrow(s):
@@ -72,8 +81,8 @@ class Movie(object):
             raise Exception("There is no valid criticker id listed in the movie info "
                             "and the movie object didn't already have one!")
         self.crit_id = self.replace_if_not_none(movie_info.get('crit_id'), self.crit_id)
-        self.crit_popularity_page = self.replace_if_not_none(movie_info.get('crit_popularity_page'),
-                                                             self.crit_popularity_page)
+        self.crit_popularity = self.replace_if_not_none(movie_info.get('crit_popularity'),
+                                                             self.crit_popularity)
         self.crit_url = self.replace_if_not_none(movie_info.get('crit_url'), self.crit_url)
         self.title = self.replace_if_not_none(movie_info.get('title'), self.title)
         self.year = self.replace_if_not_none(movie_info.get('year'), self.year)
@@ -106,6 +115,7 @@ class Movie(object):
         self.keywords = self.replace_if_not_none(movie_info.get('keywords'), self.keywords)
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
         self.vote_details = self.replace_if_not_none(movie_info.get('vote_details'), self.vote_details)
+        self.crit_myratings = self.update_if_not_none(movie_info.get('crit_myratings'), self.crit_myratings)
         self.date_added = self.replace_if_not_none(self.str_to_arrow(movie_info.get('date_added')),
                                                    self.date_added)
         self.criticker_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('criticker_updated')),

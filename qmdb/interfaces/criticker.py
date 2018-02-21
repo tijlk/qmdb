@@ -14,8 +14,9 @@ banned_movies = {154: 'Apocalypse Now Redux'}
 
 
 class CritickerScraper(Scraper):
-    def __init__(self, cookies=config.criticker['cookies']):
-        self.cookies = cookies
+    def __init__(self, config=config.criticker, user='tijl'):
+        self.user = user
+        self.cookies = config[user]
 
     def refresh_movie(self, movie):
         super().refresh_movie(movie)
@@ -54,10 +55,9 @@ class CritickerScraper(Scraper):
             trailer_url = 'https://www.youtube.com/watch?v={}'.format(trailer_url_id)
         try:
             imdb_url = soup.find('p', attrs={'class': 'fi_extrainfo', 'id': 'fi_info_ext'}).find('a').get('href')
+            imdbid = int(re.match(r'.+tt(\d{7})\/', imdb_url).groups()[0])
         except AttributeError:
             imdbid = None
-        else:
-            imdbid = int(re.match(r'.+tt(\d{7})\/', imdb_url).groups()[0])
         try:
             crit_rating = float(soup.find('span', attrs={'itemprop': 'ratingValue'}).text)
         except AttributeError:
@@ -86,7 +86,7 @@ class CritickerScraper(Scraper):
         year = int(match.groups()[0])
         return year
 
-    def get_movielist_movie_attributes(self, movie_html, crit_popularity_page=None):
+    def get_movielist_movie_attributes(self, movie_html, popularity=None, pagenr=None, nr_pages=None):
         """
         Gets some attributes from the Criticker html for a single movie in a movie list
         :param movie_html: a BeautifulSoup object containing the basic info for a single movie
@@ -98,17 +98,24 @@ class CritickerScraper(Scraper):
         title = a.get('title')
         year = self.get_year_from_movielist_title(a.text)
         movie_info = {'crit_id': id,
-                      'crit_popularity_page': crit_popularity_page,
                       'crit_url': url,
                       'title': title,
-                      'year': year,
-                      'date_added': arrow.now()}
+                      'year': year}
+        if popularity is not None and pagenr is not None and nr_pages is not None:
+            movie_info.update({'crit_popularity': popularity - (pagenr - 1)/(nr_pages - 1),
+                               'date_added': arrow.now()})
+        try:
+            rating = {self.user: int(movie_html.find('div', attrs={'title': 'Your Ranking'}).text)}
+        except TypeError:
+            rating = None
+        if rating is not None:
+            movie_info.update({'crit_myratings': rating})
         return movie_info
 
-    def get_movie_list_page(self, pagenr=1, min_popularity=1):
-        criticker_url = 'https://www.criticker.com/films/?filter=n{}zor&p={}'.format(min_popularity, pagenr)
+    @staticmethod
+    def get_movie_list_html(url, cookies=None):
         try:
-            r = requests.get(criticker_url)
+            r = requests.get(url, cookies=cookies)
             time.sleep(2)
         except ConnectionError:
             print("Could not connect to Criticker.")
@@ -118,22 +125,66 @@ class CritickerScraper(Scraper):
             movie_list = soup.find('ul', attrs={'class': 'fl_titlelist'})\
                          .find_all('li', attrs={'id': re.compile(r'fl_titlelist_title_\d+')})
         except AttributeError:
-            print("Couldn't process movies on page {}.".format(pagenr))
-            return [], None
-        movies = [self.get_movielist_movie_attributes(h, crit_popularity_page=pagenr) for h in movie_list]
-        movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
-        nr_pages_text = str(next(soup.find('p', attrs={'id': 'fl_nav_pagenums_page'}).children))
+            print("Couldn't process movies on url {}.".format(url))
+            return [], 0
+        try:
+            nr_pages_text = str(next(soup.find('p', attrs={'id': 'fl_nav_pagenums_page'}).children))
+        except AttributeError:
+            return [], 0
         nr_pages = int(re.match(r'Page\s+\d+\s+of\s+(\d+)\s*', nr_pages_text).groups()[0])
+        return movie_list, nr_pages
+
+    def get_movie_list_popularity_page(self, pagenr=1, popularity=10, min_year=1):
+        criticker_url = 'https://www.criticker.com/films/?filter=n{}zp{}zf{}zor&p={}'.format(popularity, popularity,
+                                                                                             min_year, pagenr)
+        movie_list, nr_pages = self.get_movie_list_html(criticker_url)
+        movies = [self.get_movielist_movie_attributes(h, popularity=popularity, pagenr=pagenr, nr_pages=nr_pages)
+                  for h in movie_list]
+        movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
         return movies, nr_pages
 
-    def get_movies(self, min_popularity=1, debug=False, max_pages=2):
-        print("Downloading movies from Criticker with a minimum popularity of {}.".format(min_popularity))
-        _, nr_pages = self.get_movie_list_page(min_popularity=min_popularity)
+    def get_movies_of_popularity(self, popularity=1, min_year=1, debug=False, max_pages=2):
+        print("Downloading movies from Criticker with a minimum popularity of {} starting at the year {}."
+              .format(popularity, min_year))
+        _, nr_pages = self.get_movie_list_popularity_page(popularity=popularity, min_year=min_year)
         movies = []
         if debug:
             nr_pages = min([max_pages, nr_pages])
         for pagenr in range(1, nr_pages+1):
             print("   Getting page {} of {}".format(pagenr, nr_pages))
-            movies_this_page, _ = self.get_movie_list_page(pagenr=pagenr, min_popularity=min_popularity)
+            movies_this_page, _ = self.get_movie_list_popularity_page(pagenr=pagenr, popularity=popularity, min_year=min_year)
             movies += movies_this_page
+        return movies
+
+    def fibonacci(self, n):
+        if n == 1:
+            return 1
+        elif n == 0:
+            return 0
+        else:
+            return self.fibonacci(n - 1) + self.fibonacci(n - 2)
+
+    def get_movies(self, start_popularity=1, debug=False):
+        year = arrow.now().year + 1
+        popularity_year_tuples = []
+        for i, popularity in enumerate(range(start_popularity, 11)):
+            year -= self.fibonacci(i+2)
+            popularity_year_tuples.append((popularity, year))
+
+        movies = []
+        for popularity, year in reversed(popularity_year_tuples):
+            movies += self.get_movies_of_popularity(popularity=popularity, min_year=year, debug=debug)
+        return movies
+
+    def get_ratings_page(self, pagenr=1):
+        criticker_url = 'https://www.criticker.com/rankings/?p={}'.format(pagenr)
+        movie_list, nr_pages = self.get_movie_list_html(criticker_url, cookies=self.cookies)
+        movies = [self.get_movielist_movie_attributes(h) for h in movie_list]
+        movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
+        return movies, nr_pages
+
+    def get_ratings(self):
+        movies, nr_pages = self.get_ratings_page()
+        for pagenr in range(2, nr_pages+1):
+            movies += self.get_ratings_page(pagenr=pagenr)
         return movies
