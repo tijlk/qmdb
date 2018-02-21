@@ -66,6 +66,10 @@ class Movie(object):
             return old_value.update(new_value) if new_value is not None else old_value
 
     @staticmethod
+    def replace_if_none(new_value, old_value):
+        return new_value if old_value is None else old_value
+
+    @staticmethod
     def str_to_arrow(s):
         if isinstance(s, str):
             return arrow.get(s)
@@ -116,8 +120,7 @@ class Movie(object):
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
         self.vote_details = self.replace_if_not_none(movie_info.get('vote_details'), self.vote_details)
         self.crit_myratings = self.update_if_not_none(movie_info.get('crit_myratings'), self.crit_myratings)
-        self.date_added = self.update_if_not_none(self.str_to_arrow(movie_info.get('date_added')),
-                                                  self.date_added)
+        self.date_added = self.replace_if_none(self.str_to_arrow(movie_info.get('date_added')), self.date_added)
         self.criticker_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('criticker_updated')),
                                                           self.criticker_updated)
         self.imdb_main_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('imdb_main_updated')),
