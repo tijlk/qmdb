@@ -18,6 +18,51 @@ def create_test_tables(variant='normal'):
                            'title': 'Inception',
                            'year': 2010,
                            'date_added': arrow.get('2018-02-04 23:01:58+01:00')}]
+        languages_records = [{'crit_id': 1234,
+                              'language': 'English',
+                              'rank': 1},
+                             {'crit_id': 1234,
+                              'language': 'French',
+                              'rank': 2},
+                             {'crit_id': 49141,
+                              'language': 'English',
+                              'rank': 1}]
+        persons_records = [{'crit_id': 1234,
+                            'role': 'cast',
+                            'name': 'Tom Cruise',
+                            'rank': 2,
+                            'canonical_name': 'Cruise, Tom',
+                            'person_id': 13},
+                           {'crit_id': 1234,
+                            'role': 'director',
+                            'name': 'J.J. Abrams',
+                            'rank': 2,
+                            'canonical_name': 'Abrams, J.J.',
+                            'person_id': 14},
+                           {'crit_id': 49141,
+                            'role': 'director',
+                            'name': 'Steven Spielberg',
+                            'rank': 1,
+                            'canonical_name': 'Spielberg, Steven',
+                            'person_id': 15},
+                           {'crit_id': 1234,
+                            'role': 'cast',
+                            'name': 'Anthony Hopkins',
+                            'rank': 1,
+                            'canonical_name': 'Hopkins, Anthony',
+                            'person_id': 16},
+                           {'crit_id': 1234,
+                            'role': 'director',
+                            'name': 'Lana Wachowski',
+                            'rank': 1,
+                            'canonical_name': 'Wachowski',
+                            'person_id': 17},
+                           {'crit_id': 49141,
+                            'role': 'cast',
+                            'name': 'Natalie Portman',
+                            'rank': 1,
+                            'canonical_name': 'Portman, Natalie',
+                            'person_id': 18}]
     elif variant == 'updates':
         movies_records = [{'crit_id': 1234,
                            'crit_popularity': 10,
@@ -69,10 +114,18 @@ def create_test_tables(variant='normal'):
                            'title': 'Inception',
                            'year': 2000,
                            'date_added': arrow.get('2018-01-01 00:00:00+01:00')}]
+        languages_records = []
+        persons_records = []
     else:
         movies_records = []
+        languages_records = []
+        persons_records = []
     for rec in movies_records:
         db.update_single_record('movies', rec)
+    for rec in languages_records:
+        db.update_single_record('languages', rec)
+    for rec in persons_records:
+        db.update_single_record('persons', rec)
 
 
 def remove_test_tables(db):

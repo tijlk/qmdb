@@ -73,7 +73,7 @@ def test_get_movie_info_matrix():
     imdbid = '0133093'
     movie_info = imdb_scraper.process_main_info(imdbid)
     assert isinstance(movie_info, dict)
-    assert movie_info['genres'] == {'Action', 'Sci-Fi'}
+    assert movie_info['genres'] == ['Action', 'Sci-Fi']
     assert movie_info['imdb_rating'] == 8.7
     assert movie_info['imdb_votes'] >= 1375000
     movie_info = imdb_scraper.process_release_info(imdbid)
@@ -96,7 +96,35 @@ def test_get_movie_info_foreign_movie():
     assert movie_info['original_title'] == 'De lift'
 
 
+@pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
+def test_get_movie_info_languages():
+    imdb_scraper = IMDBScraper()
+    movie_info = imdb_scraper.process_main_info('0211915')
+    assert set(movie_info['languages']) == {'English', 'Russian', 'French'}
+    movie_info = imdb_scraper.process_main_info('3315342')
+    assert set(movie_info['languages']) == {'English', 'Spanish'}
+
+
+@pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
+def test_get_movie_info_taglines():
+    imdb_scraper = IMDBScraper()
+    movie_info = imdb_scraper.process_taglines_info('3315342')
+    assert isinstance(movie_info, dict)
+    assert movie_info['taglines'] == ['His time has come']
+
+
 def test_refresh_movie():
     imdb_scraper = IMDBScraper()
     movie = Movie({'crit_id': 1234, 'imdbid': 133093})
     imdb_scraper.refresh_movie(movie)
+
+
+def test_remove_duplicate_dicts():
+    l = [{'a': 3, 'b': 4},
+         {'a': 1, 'b': 2},
+         {'a': 3, 'b': 4},
+         {'a': 1, 'b': 2},
+         {'a': 5, 'b': 6}]
+    imdb_scraper = IMDBScraper()
+    new_l = imdb_scraper.remove_duplicate_dicts(l)
+    assert new_l == [{'a': 3, 'b': 4}, {'a': 1, 'b': 2}, {'a': 5, 'b': 6}]

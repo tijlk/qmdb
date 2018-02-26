@@ -85,8 +85,8 @@ def test_get_update_sequence():
     assert len(seq) == 43
     for e in seq:
         assert isinstance(e, dict)
-    assert len([e for e in seq if e['source'] == 'criticker']) == 6
-    assert len([e for e in seq if e['source'] == 'omdb']) == 2
+    assert len([e for e in seq if e['source'] == 'criticker']) == 5
+    assert len([e for e in seq if e['source'] == 'omdb']) == 3
     remove_test_tables(db)
 
 

@@ -46,7 +46,8 @@ class Movie(object):
         self.imdb_vote_details_updated = None
         self.imdb_plot_updated = None
         self.omdb_updated = None
-        self.crit_myratings = None
+        self.crit_myratings = dict()
+        self.crit_mypsis = dict()
         self.update_from_dict(movie_info)
 
     def print(self):
@@ -56,14 +57,6 @@ class Movie(object):
     @staticmethod
     def replace_if_not_none(new_value, old_value):
         return new_value if new_value is not None else old_value
-
-    @staticmethod
-    def update_if_not_none(new_value, old_value):
-        if old_value is None:
-            return new_value
-        else:
-            assert isinstance(old_value, dict)
-            return old_value.update(new_value) if new_value is not None else old_value
 
     @staticmethod
     def replace_if_none(new_value, old_value):
@@ -119,7 +112,10 @@ class Movie(object):
         self.keywords = self.replace_if_not_none(movie_info.get('keywords'), self.keywords)
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
         self.vote_details = self.replace_if_not_none(movie_info.get('vote_details'), self.vote_details)
-        self.crit_myratings = self.update_if_not_none(movie_info.get('crit_myratings'), self.crit_myratings)
+        if movie_info.get('crit_myratings') is not None:
+            self.crit_myratings.update(movie_info.get('crit_myratings'))
+        if movie_info.get('crit_mypsis') is not None:
+            self.crit_mypsis.update(movie_info.get('crit_mypsis'))
         self.date_added = self.replace_if_none(self.str_to_arrow(movie_info.get('date_added')), self.date_added)
         self.criticker_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('criticker_updated')),
                                                           self.criticker_updated)

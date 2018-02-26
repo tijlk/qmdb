@@ -24,8 +24,8 @@ def test_cookies_work():
 
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
 def test_get_criticker_movie_list_page():
-    pagenr = 2
-    popularity = 3
+    pagenr = 1
+    popularity = 9
     min_year = 2000
     criticker_scraper = CritickerScraper()
     movies, nr_pages = criticker_scraper.get_movie_list_popularity_page(pagenr=pagenr, popularity=popularity, min_year=min_year)

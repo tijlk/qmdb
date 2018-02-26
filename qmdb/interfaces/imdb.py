@@ -40,10 +40,16 @@ class IMDBScraper(Scraper):
 
     @staticmethod
     def remove_duplicate_dicts(l):
-        return [dict(t) for t in set([tuple(d.items()) for d in l])]
+        list_of_tuples = [tuple(d.items()) for d in l]
+        list_of_tuples = sorted(set(list_of_tuples), key=list_of_tuples.index)
+        return [dict(t) for t in list_of_tuples]
 
     def process_main_info(self, imdbid):
-        main_info = self.ia.get_movie_main(imdbid)['data']
+        try:
+            main_info = self.ia.get_movie_main(imdbid)['data']
+        except:
+            print("ERROR: Could not download main information from IMDb.")
+            return None
         info = dict()
         info['imdb_title'] = main_info.get('title')
         info['imdb_year'] = main_info.get('year')
@@ -63,15 +69,15 @@ class IMDBScraper(Scraper):
             info['writer'] = [self.person_to_dict(person) for person in writers]
             info['writer'] = [e for e in info['writer'] if e is not None]
             info['writer'] = self.remove_duplicate_dicts(info['writer'])
-        info['genres'] = None if main_info.get('genres') is None else set(main_info.get('genres'))
+        info['genres'] = None if main_info.get('genres') is None else sorted(list(set(main_info.get('genres'))))
         runtimes = main_info.get('runtimes')
         if runtimes is not None:
             info['runtime'] = int(round(np.median([int(runtime) for runtime in main_info['runtimes']])))
-        info['countries'] = None if main_info.get('countries') is None else set(main_info.get('countries'))
+        info['countries'] = None if main_info.get('countries') is None else main_info.get('countries')
         info['imdb_rating'] = main_info.get('rating')
         info['imdb_votes'] = self.parse_imdb_votes(main_info.get('votes'))
         info['plot_storyline'] = main_info.get('plot outline')
-        info['languages'] = None if main_info.get('languages') is None else set(main_info.get('languages'))
+        info['languages'] = None if main_info.get('languages') is None else main_info.get('languages')
         info['imdb_main_updated'] = arrow.now()
         return info
 
@@ -130,7 +136,11 @@ class IMDBScraper(Scraper):
         return original_release_date, dutch_release_date
 
     def process_release_info(self, imdbid):
-        release_info = self.ia.get_movie_release_dates(imdbid)['data']
+        try:
+            release_info = self.ia.get_movie_release_dates(imdbid)['data']
+        except:
+            print("ERROR: Could not download release information from IMDb.")
+            return None
         info = dict()
         original_release_date, dutch_release_date = self.get_release_date(release_info['release dates'])
         info['original_release_date'] = original_release_date
@@ -159,7 +169,11 @@ class IMDBScraper(Scraper):
                 'tag': tag}
 
     def process_metacritic_info(self, imdbid):
-        metacritic_info = self.ia.get_movie_critic_reviews(imdbid)['data']
+        try:
+            metacritic_info = self.ia.get_movie_critic_reviews(imdbid)['data']
+        except:
+            print("ERROR: Could not download metacritic information from IMDb.")
+            return None
         info = dict()
         try:
             info['metacritic_score'] = int(metacritic_info['metascore'])
@@ -169,28 +183,44 @@ class IMDBScraper(Scraper):
         return info
 
     def process_keywords_info(self, imdbid):
-        keywords_info = self.ia.get_movie_keywords(imdbid)['data']
+        try:
+            keywords_info = self.ia.get_movie_keywords(imdbid)['data']
+        except:
+            print("ERROR: Could not download keywords information from IMDb.")
+            return None
         info = dict()
-        info['keywords'] = set(keywords_info['keywords'])
+        info['keywords'] = list(set(keywords_info['keywords']))
         info['imdb_keywords_updated'] = arrow.now()
         return info
 
     def process_taglines_info(self, imdbid):
-        taglines_info = self.ia.get_movie_taglines(imdbid)['data']
+        try:
+            taglines_info = self.ia.get_movie_taglines(imdbid)['data']
+        except:
+            print("ERROR: Could not download taglines information from IMDb.")
+            return None
         info = dict()
-        info['taglines'] = [{'tagline': tagline, 'id': i} for i, tagline in enumerate(taglines_info['taglines'])]
+        info['taglines'] = [tagline for tagline in taglines_info['taglines']]
         info['imdb_taglines_updated'] = arrow.now()
         return info
 
     def process_vote_details_info(self, imdbid):
-        vote_details = self.ia.get_movie_vote_details(imdbid)['data']
+        try:
+            vote_details = self.ia.get_movie_vote_details(imdbid)['data']
+        except:
+            print("ERROR: Could not download vote_details information from IMDb.")
+            return None
         info = dict()
         info['vote_details'] = vote_details['demographics']
         info['imdb_vote_details_updated'] = arrow.now()
         return info
 
     def process_plot_info(self, imdbid):
-        plot_info = self.ia.get_movie_plot(imdbid)['data']
+        try:
+            plot_info = self.ia.get_movie_plot(imdbid)['data']
+        except:
+            print("ERROR: Could not download plot information from IMDb.")
+            return None
         info = dict()
         info['plot_summary'] = min(plot_info.get('plot'), key=len)
         info['imdb_plot_updated'] = arrow.now()

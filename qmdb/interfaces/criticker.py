@@ -8,6 +8,7 @@ from requests import ConnectionError
 
 from qmdb.config import config
 from qmdb.interfaces.interfaces import Scraper
+from qmdb.movie.movie import Movie
 
 
 banned_movies = {154: 'Apocalypse Now Redux'}
@@ -45,6 +46,16 @@ class CritickerScraper(Scraper):
         except AttributeError:
             my_rating = None
         try:
+            my_psi = int(soup.find('div', attrs={'class': 'fi_psi_div'}).text)
+        except (AttributeError, ValueError):
+            try:
+                extra_infos = [s.find('span') for s in soup.findAll('p', attrs={'class': 'fi_extrainfo'})
+                               if s.find('span') is not None]
+                extra_infos = [e for e in extra_infos if 'PSI' in str(e.previous)]
+                my_psi = int(extra_infos[0].text)
+            except (AttributeError, IndexError):
+                my_psi = None
+        try:
             trailer_url_id = re.search(r'.*youtube.*\/([a-zA-Z0-9]+)$',
                                        soup.find('div', attrs={'id': 'fi_trailer'})
                                            .find('iframe').get('src')).groups()[0]
@@ -66,13 +77,17 @@ class CritickerScraper(Scraper):
         except AttributeError:
             crit_votes = 0
 
-        return {'imdbid': imdbid,
-                'criticker_updated': arrow.now(),
-                'poster_url': poster_url,
-                'my_rating': my_rating,
-                'trailer_url': trailer_url,
-                'crit_rating': crit_rating,
-                'crit_votes': crit_votes}
+        movie_info = {'imdbid': imdbid,
+                      'criticker_updated': arrow.now(),
+                      'poster_url': poster_url,
+                      'trailer_url': trailer_url,
+                      'crit_rating': crit_rating,
+                      'crit_votes': crit_votes}
+        if my_rating is not None:
+            movie_info['crit_myratings'] = {self.user: my_rating}
+        if my_psi is not None:
+            movie_info['crit_mypsis'] = {self.user: my_psi}
+        return movie_info
 
     @staticmethod
     def get_year_from_movielist_title(title):
@@ -104,6 +119,12 @@ class CritickerScraper(Scraper):
         if popularity is not None and pagenr is not None and nr_pages is not None:
             movie_info.update({'crit_popularity': popularity - (pagenr - 1)/(nr_pages - 1)})
         try:
+            psi = {self.user: int(movie_html.find('div', attrs={'class': 'pti'}).text)}
+        except AttributeError:
+            psi = None
+        if psi is not None:
+            movie_info.update({'crit_mypsis': psi})
+        try:
             rating = {self.user: int(movie_html.find('div', attrs={'title': 'Your Ranking'}).text)}
         except AttributeError:
             rating = None
@@ -111,10 +132,9 @@ class CritickerScraper(Scraper):
             movie_info.update({'crit_myratings': rating})
         return movie_info
 
-    @staticmethod
-    def get_movie_list_html(url, cookies=None):
+    def get_movie_list_html(self, url):
         try:
-            r = requests.get(url, cookies=cookies)
+            r = requests.get(url, cookies=self.cookies)
             time.sleep(1)
         except ConnectionError:
             print("Could not connect to Criticker.")
@@ -142,13 +162,13 @@ class CritickerScraper(Scraper):
         movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
         return movies, nr_pages
 
-    def get_movies_of_popularity(self, popularity=1, min_year=1, debug=False, max_pages=2):
+    def get_movies_of_popularity(self, popularity=1, min_year=1, debug=False, debug_pages=2):
         print("Downloading movies from Criticker with a minimum popularity of {} starting at the year {}."
               .format(popularity, min_year))
         _, nr_pages = self.get_movie_list_popularity_page(popularity=popularity, min_year=min_year)
         movies = []
         if debug:
-            nr_pages = min([max_pages, nr_pages])
+            nr_pages = min([debug_pages, nr_pages])
         for pagenr in range(1, nr_pages+1):
             print("   Getting page {} of {}".format(pagenr, nr_pages))
             movies_this_page, _ = self.get_movie_list_popularity_page(pagenr=pagenr, popularity=popularity, min_year=min_year)
@@ -177,7 +197,7 @@ class CritickerScraper(Scraper):
 
     def get_ratings_page(self, pagenr=1):
         criticker_url = 'https://www.criticker.com/rankings/?p={}'.format(pagenr)
-        movie_list, nr_pages = self.get_movie_list_html(criticker_url, cookies=self.cookies)
+        movie_list, nr_pages = self.get_movie_list_html(criticker_url)
         print("Downloading ratings from Criticker, page {} of {}.".format(pagenr, nr_pages))
         movies = [self.get_movielist_movie_attributes(h) for h in movie_list]
         movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
@@ -189,3 +209,17 @@ class CritickerScraper(Scraper):
             new_movies, _ = self.get_ratings_page(pagenr=pagenr)
             movies += new_movies
         return movies
+
+    def get_criticker_movies(self, db, start_popularity=2):
+        movies = self.get_movies(start_popularity=start_popularity)
+        print("\nSaving movie information to the database\n")
+        for movie_info in movies:
+            db.set_movie(movie_info)
+        db.print()
+
+    def get_criticker_ratings(self, db):
+        ratings = self.get_ratings()
+        print("\nSaving rating information to the database\n")
+        for movie_info in ratings:
+            db.set_movie(movie_info)
+        db.print()

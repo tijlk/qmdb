@@ -38,9 +38,9 @@ class Updater(object):
         self.years = None
         self.crit_pop = None
         self.earliest_date_added = None
-        self.max_connections_per_hour = {'criticker': 250,
+        self.max_connections_per_hour = {'criticker': 400,
                                          'omdb': 40,
-                                         'imdb': 400}
+                                         'imdb': 800}
 
     def update_movies(self, db, n=None, weibull_lambda=1.5):
         self.get_movies_stats(db)
@@ -56,10 +56,13 @@ class Updater(object):
         for i, source_to_update in enumerate(sources_to_update):
             time_to_sleep = max(1, (source_to_update['next_update'] - arrow.now()).total_seconds())
             last_updated = getattr(db.movies[source_to_update['crit_id']], source_to_update['source'] + '_updated')
+            crit_popularity = db.movies[source_to_update['crit_id']].crit_popularity
+            if crit_popularity is None:
+                crit_popularity = 5
             print("{}: Updating {} info for '{}' ({}, popularity {:.1f}) {}. Last updated {}.".format(
                 arrow.now().format('HH:mm:ss'), source_to_update['source'], db.movies[source_to_update['crit_id']].title,
                 db.movies[source_to_update['crit_id']].year,
-                db.movies[source_to_update['crit_id']].crit_popularity,
+                crit_popularity,
                 arrow.now().shift(seconds=time_to_sleep).humanize(),
                 humanized_time(last_updated)))
             time.sleep(time_to_sleep)
