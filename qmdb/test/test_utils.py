@@ -1,5 +1,6 @@
 from qmdb.database.database import MySQLDatabase
 import arrow
+import mock
 
 
 def create_test_tables(variant='normal'):
@@ -131,3 +132,13 @@ def create_test_tables(variant='normal'):
 def remove_test_tables(db):
     for tbl in ['countries', 'genres', 'keywords', 'languages', 'movies', 'persons', 'taglines', 'vote_details']:
         db.remove_table(table_name=tbl)
+
+
+def read_file(file):
+    with open(file, 'r') as myfile:
+        data = myfile.read().replace('\n', ' ')
+        return data
+
+
+def side_effect(fn):
+    return mock.MagicMock(side_effect=fn)

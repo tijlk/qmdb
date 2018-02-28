@@ -3,12 +3,21 @@ import os
 import arrow
 import pytest
 from mock import patch
+import mock
 
 from qmdb.database.database import MySQLDatabase
 from qmdb.interfaces.criticker import CritickerScraper
 from qmdb.movie.movie import Movie
 from qmdb.utils.utils import no_internet
-from qmdb.test.test_utils import create_test_tables, remove_test_tables
+from qmdb.test.test_utils import create_test_tables, remove_test_tables, read_file, side_effect
+import requests
+import requests_mock
+from bs4 import BeautifulSoup, ResultSet, Tag
+
+
+session = requests.Session()
+adapter = requests_mock.Adapter()
+session.mount('mock', adapter)
 
 
 def test_config_cookies():
@@ -17,32 +26,108 @@ def test_config_cookies():
     assert 'uid2' in crit_scraper.cookies
 
 
-@pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-def test_cookies_work():
+def test_get_movie_info():
     crit_scraper = CritickerScraper()
+    with requests_mock.mock() as m:
+        m.get('http://www.criticker.com/film/The-Matrix/',
+              text=read_file('test/fixtures/criticker-the-matrix.html'))
+        movie_info = crit_scraper.get_movie_info('http://www.criticker.com/film/The-Matrix/')
+    assert movie_info['poster_url'] == 'https://www.criticker.com/img/films/posters/The-Matrix.jpg'
+    assert movie_info['imdbid'] == 133093
+    assert movie_info['crit_rating'] == pytest.approx(7.71, 0.3)
+    assert movie_info['crit_votes'] == pytest.approx(27493, 1000)
+    assert movie_info['crit_myratings']['tijl'] == 93
+    assert movie_info['crit_mypsis']['tijl'] == pytest.approx(80, 10)
 
 
-@pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-def test_get_criticker_movie_list_page():
-    pagenr = 1
-    popularity = 9
-    min_year = 2000
-    criticker_scraper = CritickerScraper()
-    movies, nr_pages = criticker_scraper.get_movie_list_popularity_page(pagenr=pagenr, popularity=popularity, min_year=min_year)
-    assert len(movies) == 60
-    assert isinstance(movies[0], dict)
-    assert isinstance(movies[0]['date_added'], arrow.Arrow)
-    assert isinstance(nr_pages, int)
+def test_get_year_from_movielist_title():
+    crit_scraper = CritickerScraper()
+    movielist_title = 'The Matrix (1999)'
+    assert crit_scraper.get_year_from_movielist_title(movielist_title) == 1999
 
 
-@pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-def test_get_criticker_movie_list(mocker):
-    # TODO: improve this test. Why is mocker not working????
-    mocker.patch.object(CritickerScraper, 'get_movies_of_popularity', lambda *args, **kwargs: [1]*120)
-    start_popularity = 1
-    criticker_scraper = CritickerScraper()
-    movies = criticker_scraper.get_movies(start_popularity=start_popularity)
-    assert len(movies) == 1200
+def test_get_movielist_movie_attributes():
+    crit_scraper = CritickerScraper()
+    raw_html = read_file('test/fixtures/criticker-normal-movie-in-movie-list.html')
+    html_info = BeautifulSoup(raw_html, "lxml").find('li')
+    movie_info = crit_scraper.get_movielist_movie_attributes(html_info)
+    assert set(movie_info.keys()) == {'crit_id', 'crit_url', 'title', 'year', 'date_added', 'crit_mypsis'}
+    assert movie_info['crit_mypsis'] == {'tijl': 55}
+    assert movie_info['crit_id'] == 26496
+    assert movie_info['crit_url'] == 'https://www.criticker.com/film/Issiz-adam/'
+    assert movie_info['title'] == 'Issiz adam'
+    assert movie_info['year'] == 2008
+    assert 'date_added' in movie_info
+    assert arrow.get(movie_info['date_added']).humanize() == 'just now'
+
+    raw_html = read_file('test/fixtures/criticker-rated-movie-in-movie-list.html')
+    html_info = BeautifulSoup(raw_html, "lxml").find('li')
+    movie_info = crit_scraper.get_movielist_movie_attributes(html_info)
+    assert set(movie_info.keys()) == {'crit_id', 'crit_url', 'title', 'year', 'date_added', 'crit_myratings'}
+    assert movie_info['crit_myratings'] == {'tijl': 61}
+
+    raw_html = read_file('test/fixtures/criticker-nopsi-movie-in-movie-list.html')
+    html_info = BeautifulSoup(raw_html, "lxml").find('li')
+    movie_info = crit_scraper.get_movielist_movie_attributes(html_info)
+    assert set(movie_info.keys()) == {'crit_id', 'crit_url', 'title', 'year', 'date_added'}
+
+
+def test_get_movie_list_html():
+    crit_scraper = CritickerScraper()
+    with requests_mock.mock() as m:
+        m.get('https://www.criticker.com/films/?filter=or&view=all',
+              text=read_file('test/fixtures/criticker-movie-list.html'))
+        movie_list, nr_pages = crit_scraper.get_movie_list_html('https://www.criticker.com/films/?filter=or&view=all')
+    assert nr_pages == 2283
+    assert len(movie_list) == 60
+    assert isinstance(movie_list, ResultSet)
+    assert isinstance(movie_list[0], Tag)
+
+
+@patch.object(CritickerScraper, 'get_movie_list_html', new=side_effect(lambda x: ([1, 2, 3, 4, 154, 1000], 6)))
+@patch.object(CritickerScraper, 'get_movielist_movie_attributes', new=side_effect(lambda x, **kwargs: {'crit_id': x}))
+def test_get_movie_list_popularity_page(mocker):
+    crit_scraper = CritickerScraper()
+    movies, nr_pages = crit_scraper.get_movie_list_page('https://www.criticker.com/films/?filter=n9zp9zf2000zor&p=1',
+                                                        pagenr=1, popularity=9)
+    assert nr_pages == 6
+    assert len(movies) == 5
+    assert movies[0] == {'crit_id': 1}
+
+
+@patch.object(CritickerScraper, 'get_movie_list_popularity_page', new=side_effect(lambda **kwargs: ([1, 2, 3], 3)))
+def test_get_movies_of_popularity(mocker):
+    crit_scraper = CritickerScraper()
+    movies = crit_scraper.get_movies_of_popularity(popularity=8, min_year=2000)
+    assert movies == [1, 2, 3, 1, 2, 3, 1, 2, 3]
+    assert crit_scraper.get_movie_list_popularity_page.call_count == 4
+    assert crit_scraper.get_movie_list_popularity_page.call_args_list[0][1] == {'min_year': 2000, 'popularity': 8}
+    assert crit_scraper.get_movie_list_popularity_page.call_args_list[1][1] == \
+           {'min_year': 2000, 'popularity': 8, 'pagenr': 1}
+
+
+def test_fibonacci():
+    crit_scraper = CritickerScraper()
+    assert crit_scraper.fibonacci(0) == 0
+    assert crit_scraper.fibonacci(1) == 1
+    assert crit_scraper.fibonacci(2) == 1
+    assert crit_scraper.fibonacci(3) == 2
+    assert crit_scraper.fibonacci(5) == 5
+
+
+@patch.object(arrow, 'now', new=side_effect(lambda: arrow.get('2018-01-01')))
+@patch.object(CritickerScraper, 'get_movies_of_popularity', new=side_effect(lambda **kwargs: [1]))
+def test_get_movies():
+    crit_scraper = CritickerScraper()
+    movies = crit_scraper.get_movies(start_popularity=8)
+    assert len(movies) == 3
+    assert crit_scraper.get_movies_of_popularity.call_args_list[0][1] ==\
+           {'debug': False, 'min_year': 2013, 'popularity': 10}
+    assert crit_scraper.get_movies_of_popularity.call_args_list[1][1] ==\
+           {'debug': False, 'min_year': 2016, 'popularity': 9}
+    assert crit_scraper.get_movies_of_popularity.call_args_list[2][1] ==\
+           {'debug': False, 'min_year': 2018, 'popularity': 8}
+
 
 
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
@@ -120,12 +205,6 @@ def test_criticker_refresh_movie(mocker):
     mocker.patch.object(crit_scraper, 'get_movie_info', lambda *args: 1234)
     movie = crit_scraper.refresh_movie(movie)
     assert movie is None
-
-
-def test_get_year_from_movielist_title():
-    criticker_scraper = CritickerScraper()
-    movielist_title = 'The Matrix (1999)'
-    assert criticker_scraper.get_year_from_movielist_title(movielist_title) == 1999
 
 
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')

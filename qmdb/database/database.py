@@ -128,7 +128,6 @@ class MySQLDatabase(Database):
             'crit_id': 'mediumint unsigned not null',
             'tagline': 'varchar(128) not null',
             'rank': 'smallint unsigned not null'
-
         }
         self.columns_vote_details = {
             'crit_id': 'mediumint unsigned not null',
@@ -195,7 +194,7 @@ class MySQLDatabase(Database):
         self.create_table('countries', self.columns_countries, ['crit_id', 'country'], ['country'])
         self.create_table('languages', self.columns_languages, ['crit_id', 'language'], ['language'])
         self.create_table('keywords', self.columns_keywords, ['crit_id', 'keyword'], ['keyword'])
-        self.create_table('taglines', self.columns_taglines, ['crit_id'], ['crit_id'])
+        self.create_table('taglines', self.columns_taglines, ['crit_id', 'rank'], ['rank'])
         self.create_table('vote_details', self.columns_vote_details, ['crit_id', 'demographic'], ['demographic'])
         self.create_table('ratings', self.columns_ratings, ['crit_id', 'user'], ['user'])
         self.create_table('psis', self.columns_psis, ['crit_id', 'user'], ['user'])

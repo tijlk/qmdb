@@ -85,7 +85,8 @@ class IMDBScraper(Scraper):
     def parse_imdb_votes(votes):
         try:
             votes = int(votes)
-        except TypeError:
+        except (TypeError, ValueError):
+            # TODO: be able to process '(2,382)'
             votes = None
         return votes
 
@@ -98,7 +99,10 @@ class IMDBScraper(Scraper):
         try:
             date_value = arrow.get(date_str, 'D MMMM YYYY')
         except arrow.parser.ParserError:
-            date_value = arrow.get(date_str, 'MMMM YYYY')
+            try:
+                date_value = arrow.get(date_str, 'MMMM YYYY')
+            except arrow.parser.ParserError:
+                date_value = arrow.get(date_str, 'YYYY')
         tags = [tag for tag in [results[4], results[6], results[8]] if tag not in (None, '')]
         if len(tags) == 0:
             tags = None
@@ -136,6 +140,7 @@ class IMDBScraper(Scraper):
         return original_release_date, dutch_release_date
 
     def process_release_info(self, imdbid):
+        return None
         try:
             release_info = self.ia.get_movie_release_dates(imdbid)['data']
         except:
@@ -194,13 +199,17 @@ class IMDBScraper(Scraper):
         return info
 
     def process_taglines_info(self, imdbid):
+        return None
         try:
             taglines_info = self.ia.get_movie_taglines(imdbid)['data']
         except:
             print("ERROR: Could not download taglines information from IMDb.")
             return None
         info = dict()
-        info['taglines'] = [tagline for tagline in taglines_info['taglines']]
+        try:
+            info['taglines'] = [tagline for tagline in taglines_info['taglines']]
+        except KeyError:
+            pass
         info['imdb_taglines_updated'] = arrow.now()
         return info
 
@@ -211,7 +220,7 @@ class IMDBScraper(Scraper):
             print("ERROR: Could not download vote_details information from IMDb.")
             return None
         info = dict()
-        info['vote_details'] = vote_details['demographics']
+        info['vote_details'] = vote_details.get('demographics')
         info['imdb_vote_details_updated'] = arrow.now()
         return info
 

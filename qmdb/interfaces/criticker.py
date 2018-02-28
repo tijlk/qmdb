@@ -11,7 +11,8 @@ from qmdb.interfaces.interfaces import Scraper
 from qmdb.movie.movie import Movie
 
 
-banned_movies = {154: 'Apocalypse Now Redux'}
+banned_movies = {154: 'Apocalypse Now Redux',
+                 1011: "The Exorcist: The Version You've Never Seen"}
 
 
 class CritickerScraper(Scraper):
@@ -153,14 +154,17 @@ class CritickerScraper(Scraper):
         nr_pages = int(re.match(r'Page\s+\d+\s+of\s+(\d+)\s*', nr_pages_text).groups()[0])
         return movie_list, nr_pages
 
-    def get_movie_list_popularity_page(self, pagenr=1, popularity=10, min_year=1):
-        criticker_url = 'https://www.criticker.com/films/?filter=n{}zp{}zf{}zor&p={}'.format(popularity, popularity,
-                                                                                             min_year, pagenr)
-        movie_list, nr_pages = self.get_movie_list_html(criticker_url)
+    def get_movie_list_page(self, url, pagenr=None, popularity=None):
+        movie_list, nr_pages = self.get_movie_list_html(url)
         movies = [self.get_movielist_movie_attributes(h, popularity=popularity, pagenr=pagenr, nr_pages=nr_pages)
                   for h in movie_list]
         movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
         return movies, nr_pages
+
+    def get_movie_list_popularity_page(self, pagenr=1, popularity=10, min_year=1):
+        criticker_url = 'https://www.criticker.com/films/?filter=n{}zp{}zf{}zor&p={}'\
+            .format(popularity, popularity, min_year, pagenr)
+        return self.get_movie_list_page(criticker_url, popularity=popularity, pagenr=pagenr)
 
     def get_movies_of_popularity(self, popularity=1, min_year=1, debug=False, debug_pages=2):
         print("Downloading movies from Criticker with a minimum popularity of {} starting at the year {}."
@@ -197,15 +201,13 @@ class CritickerScraper(Scraper):
 
     def get_ratings_page(self, pagenr=1):
         criticker_url = 'https://www.criticker.com/rankings/?p={}'.format(pagenr)
-        movie_list, nr_pages = self.get_movie_list_html(criticker_url)
-        print("Downloading ratings from Criticker, page {} of {}.".format(pagenr, nr_pages))
-        movies = [self.get_movielist_movie_attributes(h) for h in movie_list]
-        movies = [movie for movie in movies if movie['crit_id'] not in banned_movies.keys()]
-        return movies, nr_pages
+        return self.get_movie_list_page(criticker_url)
 
     def get_ratings(self):
+        print("Downloading ratings from Criticker...")
         movies, nr_pages = self.get_ratings_page()
         for pagenr in range(2, nr_pages+1):
+            print("   Getting page {} of {}".format(pagenr, nr_pages))
             new_movies, _ = self.get_ratings_page(pagenr=pagenr)
             movies += new_movies
         return movies
