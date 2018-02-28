@@ -50,6 +50,33 @@ def test_get_movie_info_no_trailer():
     assert movie_info['trailer_url'] is None
 
 
+def test_get_movie_info_no_rating_of_my_own():
+    crit_scraper = CritickerScraper()
+    with requests_mock.mock() as m:
+        m.get('http://www.criticker.com/film/The-Mask/',
+              text=read_file('test/fixtures/criticker-the-mask.html'))
+        movie_info = crit_scraper.get_movie_info('http://www.criticker.com/film/The-Mask/')
+    assert movie_info.get('crit_myratings') is None
+
+
+def test_get_movie_info_no_poster():
+    crit_scraper = CritickerScraper()
+    with requests_mock.mock() as m:
+        m.get('https://www.criticker.com/film/8-Tire-on-the-Ice/',
+              text=read_file('test/fixtures/criticker-8-tire-on-the-ice.html'))
+        movie_info = crit_scraper.get_movie_info('https://www.criticker.com/film/8-Tire-on-the-Ice/')
+    assert movie_info.get('poster_url') is None
+
+
+def test_get_movie_info_no_votes():
+    crit_scraper = CritickerScraper()
+    with requests_mock.mock() as m:
+        m.get('https://www.criticker.com/film/16-Fathoms-Deep/',
+              text=read_file('test/fixtures/criticker-16-fathoms-deep.html'))
+        movie_info = crit_scraper.get_movie_info('https://www.criticker.com/film/16-Fathoms-Deep/')
+    assert movie_info.get('crit_votes') == 0
+
+
 def test_get_year_from_movielist_title():
     crit_scraper = CritickerScraper()
     movielist_title = 'The Matrix (1999)'
@@ -140,77 +167,3 @@ def test_get_movies(mocker):
            {'debug': False, 'min_year': 2016, 'popularity': 9}
     assert crit_scraper.get_movies_of_popularity.call_args_list[2][1] ==\
            {'debug': False, 'min_year': 2018, 'popularity': 8}
-
-
-#
-#
-# @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-# def test_get_criticker_no_trailer():
-#     # No trailer
-#     crit_scraper = CritickerScraper()
-#     crit_url = 'https://www.criticker.com/film/Daens/'
-#     movie_info = crit_scraper.get_movie_info(crit_url)
-#     assert isinstance(movie_info, dict)
-#     assert 'imdbid' in movie_info
-#     assert movie_info['trailer_url'] is None
-#
-#
-# @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-# def test_get_criticker_no_rating_of_my_own():
-#     # No rating of my own
-#     crit_scraper = CritickerScraper()
-#     crit_url = 'https://www.criticker.com/film/The-Mask/'
-#     movie_info = crit_scraper.get_movie_info(crit_url)
-#     assert isinstance(movie_info, dict)
-#     assert 'imdbid' in movie_info
-#
-#
-# @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-# def test_get_criticker_no_poster():
-#     # No poster
-#     crit_scraper = CritickerScraper()
-#     crit_url = 'https://www.criticker.com/film/8-Tire-on-the-Ice/'
-#     movie_info = crit_scraper.get_movie_info(crit_url)
-#     assert isinstance(movie_info, dict)
-#     assert 'imdbid' in movie_info
-#     assert movie_info['poster_url'] is None
-#
-#
-# @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-# def test_get_criticker_no_votes():
-#     crit_scraper = CritickerScraper()
-#     crit_url = 'https://www.criticker.com/film/16-Fathoms-Deep/'
-#     movie_info = crit_scraper.get_movie_info(crit_url)
-#     assert isinstance(movie_info, dict)
-#     assert 'imdbid' in movie_info
-#     assert movie_info['crit_votes'] == 0
-#
-#
-# def test_criticker_refresh_movie(mocker):
-#     # Test valid movie info
-#     movie = Movie({'crit_id': 123, 'crit_url': 'http://blahblah'})
-#     crit_scraper = CritickerScraper()
-#     mocker.patch.object(crit_scraper, 'get_movie_info', lambda *args: {'imdbid': 123456, 'crit_updated': arrow.now()})
-#     movie = crit_scraper.refresh_movie(movie)
-#     assert movie.imdbid == 123456
-#     # Test invalid movie info
-#     mocker.patch.object(crit_scraper, 'get_movie_info', lambda *args: 1234)
-#     movie = crit_scraper.refresh_movie(movie)
-#     assert movie is None
-#
-#
-# @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
-# def test_add_criticker_movies_to_db():
-#     start_popularity = 8
-#     criticker_scraper = CritickerScraper()
-#     movies = criticker_scraper.get_movies(start_popularity=start_popularity, debug=True)
-#     db = MySQLDatabase(schema='qmdb_test', from_scratch=True)
-#     for movie in movies:
-#         db.set_movie(Movie(movie))
-#     db = MySQLDatabase(schema='qmdb_test')
-#     assert 98304 in db.movies
-#     assert db.movies[98304].title == 'Interstellar'
-#     assert db.movies[98304].year == 2014
-#     assert db.movies[98304].crit_url == 'https://www.criticker.com/film/Interstellar/'
-#     remove_test_tables(db)
-#
