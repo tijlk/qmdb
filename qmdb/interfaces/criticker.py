@@ -187,7 +187,7 @@ class CritickerScraper(Scraper):
         else:
             return self.fibonacci(n - 1) + self.fibonacci(n - 2)
 
-    def get_movies(self, start_popularity=1, debug=False):
+    def get_movies(self, db, start_popularity=1, debug=False):
         year = arrow.now().year + 1
         popularity_year_tuples = []
         for i, popularity in enumerate(range(start_popularity, 11)):
@@ -197,31 +197,27 @@ class CritickerScraper(Scraper):
         movies = []
         for popularity, year in reversed(popularity_year_tuples):
             movies += self.get_movies_of_popularity(popularity=popularity, min_year=year, debug=debug)
-        return movies
+        print("\nSaving movie information to the database\n")
+        self.save_movies(db, movies)
 
     def get_ratings_page(self, pagenr=1):
         criticker_url = 'https://www.criticker.com/rankings/?p={}'.format(pagenr)
         return self.get_movie_list_page(criticker_url)
 
-    def get_ratings(self):
+    def get_ratings(self, db, debug=False, debug_pages=2):
         print("Downloading ratings from Criticker...")
         movies, nr_pages = self.get_ratings_page()
+        if debug:
+            nr_pages = min([debug_pages, nr_pages])
         for pagenr in range(2, nr_pages+1):
             print("   Getting page {} of {}".format(pagenr, nr_pages))
             new_movies, _ = self.get_ratings_page(pagenr=pagenr)
             movies += new_movies
+        print("\nSaving rating information to the database\n")
+        self.save_movies(db, movies)
         return movies
 
-    def get_criticker_movies(self, db, start_popularity=2):
-        movies = self.get_movies(start_popularity=start_popularity)
-        print("\nSaving movie information to the database\n")
+    def save_movies(self, db, movies):
         for movie_info in movies:
-            db.set_movie(movie_info)
-        db.print()
-
-    def get_criticker_ratings(self, db):
-        ratings = self.get_ratings()
-        print("\nSaving rating information to the database\n")
-        for movie_info in ratings:
             db.set_movie(movie_info)
         db.print()
