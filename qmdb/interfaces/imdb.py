@@ -194,7 +194,10 @@ class IMDBScraper(Scraper):
             print("ERROR: Could not download keywords information from IMDb.")
             return None
         info = dict()
-        info['keywords'] = list(set(keywords_info['keywords']))
+        try:
+            info['keywords'] = list(set(keywords_info['keywords']))
+        except KeyError:
+            info['keywords'] = None
         info['imdb_keywords_updated'] = arrow.now()
         return info
 
