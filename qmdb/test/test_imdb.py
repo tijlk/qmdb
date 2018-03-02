@@ -73,6 +73,7 @@ def test_process_main_info():
 
 def test_parse_imdb_votes():
     imdb_scraper = IMDBScraper()
+    assert imdb_scraper.parse_imdb_votes(None) is None
     assert imdb_scraper.parse_imdb_votes('1000') == 1000
     assert imdb_scraper.parse_imdb_votes('(2,345)') == 2345
     assert imdb_scraper.parse_imdb_votes('xdfw2,345)') is None

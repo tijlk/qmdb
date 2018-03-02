@@ -86,7 +86,7 @@ class IMDBScraper(Scraper):
                 group = re.findall(r'\(([0-9,]+)\)', votes)[0]
                 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
                 return locale.atoi(group)
-            except IndexError:
+            except (TypeError, IndexError):
                 votes = None
         return votes
 
