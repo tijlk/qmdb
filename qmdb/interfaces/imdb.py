@@ -1,15 +1,10 @@
 import re
-import arrow
-import requests
-from bs4 import BeautifulSoup
-from requests import ConnectionError
 
-from qmdb.config import config
-from qmdb.interfaces.interfaces import Scraper
-from imdb import IMDb, utils
-from time import time
+import arrow
 import numpy as np
-from datetime import date
+from imdb import IMDb, utils
+
+from qmdb.interfaces.interfaces import Scraper
 
 
 class IMDBScraper(Scraper):

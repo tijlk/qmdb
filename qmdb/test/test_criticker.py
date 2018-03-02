@@ -1,19 +1,12 @@
-import os
-
 import arrow
 import pytest
-from mock import patch
-import mock
-
-from qmdb.database.database import MySQLDatabase
-from qmdb.interfaces.criticker import CritickerScraper
-from qmdb.movie.movie import Movie
-from qmdb.utils.utils import no_internet
-from qmdb.test.test_utils import create_test_tables, remove_test_tables, read_file, side_effect
 import requests
 import requests_mock
 from bs4 import BeautifulSoup, ResultSet, Tag
+from mock import patch
 
+from qmdb.interfaces.criticker import CritickerScraper
+from qmdb.test.test_utils import read_file, side_effect
 
 session = requests.Session()
 adapter = requests_mock.Adapter()

@@ -1,6 +1,7 @@
 from qmdb.database.database import MySQLDatabase
 import arrow
 import mock
+import pickle
 
 
 def create_test_tables(variant='normal'):
@@ -142,3 +143,13 @@ def read_file(file):
 
 def side_effect(fn):
     return mock.MagicMock(side_effect=fn)
+
+
+def save_obj(obj, name, path='test/fixtures/', protocol=pickle.HIGHEST_PROTOCOL):
+    with open(path + name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, protocol)
+
+
+def load_obj(name, path='test/fixtures/'):
+    with open(path + name + '.pkl', 'rb') as f:
+        return pickle.load(f)

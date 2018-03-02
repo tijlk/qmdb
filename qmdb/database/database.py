@@ -78,7 +78,7 @@ class MySQLDatabase(Database):
             'metacritic_score': 'smallint unsigned',
             'kind': 'varchar(64)',
             'runtime': 'smallint unsigned',
-            'plot_summary': 'varchar(1024)',
+            'plot_summary': 'varchar(2048)',
             'plot_storyline': 'varchar(8192)',
             'original_release_date': 'varchar(32)',
             'dutch_release_date': 'varchar(32)',
