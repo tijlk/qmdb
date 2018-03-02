@@ -127,7 +127,7 @@ class MySQLDatabase(Database):
         }
         self.columns_taglines = {
             'crit_id': 'mediumint unsigned not null',
-            'tagline': 'varchar(128) not null',
+            'tagline': 'varchar(256) not null',
             'rank': 'smallint unsigned not null'
         }
         self.columns_vote_details = {
