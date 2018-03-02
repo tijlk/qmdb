@@ -70,6 +70,7 @@ class MySQLDatabase(Database):
             'imdb_year': 'smallint unsigned',
             'title': 'varchar(256) not null',
             'imdb_title': 'varchar(256)',
+            'english_title': 'varchar(256)',
             'original_title': 'varchar(256)',
             'crit_rating': 'float',
             'crit_votes': 'mediumint unsigned',
@@ -122,7 +123,7 @@ class MySQLDatabase(Database):
         }
         self.columns_keywords = {
             'crit_id': 'mediumint unsigned not null',
-            'keyword': 'varchar(64) not null'
+            'keyword': 'varchar(128) not null'
         }
         self.columns_taglines = {
             'crit_id': 'mediumint unsigned not null',

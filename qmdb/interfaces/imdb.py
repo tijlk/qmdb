@@ -3,6 +3,7 @@ import re
 import arrow
 import numpy as np
 from imdb import IMDb, utils
+import locale
 
 from qmdb.interfaces.interfaces import Scraper
 
@@ -81,8 +82,12 @@ class IMDBScraper(Scraper):
         try:
             votes = int(votes)
         except (TypeError, ValueError):
-            # TODO: be able to process '(2,382)'
-            votes = None
+            try:
+                group = re.findall(r'\(([0-9,]+)\)', votes)[0]
+                locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+                return locale.atoi(group)
+            except IndexError:
+                votes = None
         return votes
 
     @staticmethod
@@ -134,29 +139,6 @@ class IMDBScraper(Scraper):
             original_release_date = None
         return original_release_date, dutch_release_date
 
-    def process_release_info(self, imdbid):
-        return None
-        try:
-            release_info = self.ia.get_movie_release_dates(imdbid)['data']
-        except:
-            print("ERROR: Could not download release information from IMDb.")
-            return None
-        info = dict()
-        original_release_date, dutch_release_date = self.get_release_date(release_info['release dates'])
-        info['original_release_date'] = original_release_date
-        info['dutch_release_date'] = dutch_release_date
-        if 'akas from release info' in release_info:
-            titles = [self.process_title(title_str) for title_str in release_info['akas from release info']]
-            original_titles = [title for title in titles if title['tag'] == 'original title']
-            if len(original_titles) > 0:
-                info['original_title'] = sorted([title_dict['title'] for title_dict in original_titles])[0]
-            else:
-                info['original_title'] = None
-        else:
-            info['original_title'] = None
-        info['imdb_release_updated'] = arrow.now()
-        return info
-
     @staticmethod
     def process_title(title_str):
         results = re.search(r'(.*?)(\s*\((.*?)\))*::(.*)',
@@ -167,6 +149,49 @@ class IMDBScraper(Scraper):
         return {'country': country,
                 'title': title,
                 'tag': tag}
+
+    def get_english_original_title(self, akas):
+        titles = [self.process_title(title_str) for title_str in akas]
+        original_titles = [title for title in titles if title['tag'] == 'original title']
+        if len(original_titles) > 0:
+            original_title = sorted([title_dict['title'] for title_dict in original_titles])[0]
+        else:
+            original_title = None
+        if original_title is not None:
+            worldwide_titles = [title for title in titles if title['country'] == 'World-wide']
+            worldwide_english_titles = [title for title in worldwide_titles if title['tag'] == 'English title']
+            english_titles = [title for title in titles if title['tag'] == 'English title']
+            usa_titles = [title for title in titles if title['country'] == 'USA']
+            if len(worldwide_english_titles) > 0:
+                english_title = sorted([title_dict['title'] for title_dict in worldwide_english_titles])[0]
+            elif len(worldwide_titles) > 0:
+                english_title = sorted([title_dict['title'] for title_dict in worldwide_titles])[0]
+            elif len(english_titles) > 0:
+                english_title = sorted([title_dict['title'] for title_dict in english_titles])[0]
+            elif len(usa_titles) > 0:
+                english_title = sorted([title_dict['title'] for title_dict in usa_titles])[0]
+            else:
+                english_title = None
+        else:
+            english_title = None
+        return english_title, original_title
+
+    def process_release_info(self, imdbid):
+        try:
+            release_info = self.ia.get_movie_release_dates(imdbid)['data']
+        except:
+            print("ERROR: Could not download release information from IMDb.")
+            return None
+        info = dict()
+        original_release_date, dutch_release_date = self.get_release_date(release_info['release dates'])
+        info['original_release_date'] = original_release_date
+        info['dutch_release_date'] = dutch_release_date
+        if 'akas from release info' in release_info:
+            english_title, original_title = self.get_english_original_title(release_info['akas from release info'])
+            info['original_title'] = original_title
+            info['english_title'] = english_title
+        info['imdb_release_updated'] = arrow.now()
+        return info
 
     def process_metacritic_info(self, imdbid):
         try:
@@ -190,14 +215,13 @@ class IMDBScraper(Scraper):
             return None
         info = dict()
         try:
-            info['keywords'] = list(set(keywords_info['keywords']))
+            info['keywords'] = sorted(list(set(keywords_info['keywords'])))
         except KeyError:
             info['keywords'] = None
         info['imdb_keywords_updated'] = arrow.now()
         return info
 
     def process_taglines_info(self, imdbid):
-        return None
         try:
             taglines_info = self.ia.get_movie_taglines(imdbid)['data']
         except:
@@ -205,9 +229,9 @@ class IMDBScraper(Scraper):
             return None
         info = dict()
         try:
-            info['taglines'] = [tagline for tagline in taglines_info['taglines']]
+            info['taglines'] = taglines_info['taglines']
         except KeyError:
-            pass
+            info['taglines'] = None
         info['imdb_taglines_updated'] = arrow.now()
         return info
 
@@ -222,6 +246,11 @@ class IMDBScraper(Scraper):
         info['imdb_vote_details_updated'] = arrow.now()
         return info
 
+    @staticmethod
+    def strip_author_from_plot(plot_str):
+        plot = re.search(r'^(.+?)(::(.*))?$', plot_str.strip()).groups()[0]
+        return plot
+
     def process_plot_info(self, imdbid):
         try:
             plot_info = self.ia.get_movie_plot(imdbid)['data']
@@ -229,6 +258,12 @@ class IMDBScraper(Scraper):
             print("ERROR: Could not download plot information from IMDb.")
             return None
         info = dict()
-        info['plot_summary'] = min(plot_info.get('plot'), key=len)
+        try:
+            plot_with_author = min(plot_info.get('plot'), key=len)
+        except TypeError:
+            info['plot_summary'] = None
+        else:
+            plot = self.strip_author_from_plot(plot_with_author)
+            info['plot_summary'] = plot
         info['imdb_plot_updated'] = arrow.now()
         return info

@@ -32,6 +32,7 @@ class Movie(object):
         self.original_release_date = None
         self.dutch_release_date = None
         self.original_title = None
+        self.english_title = None
         self.metacritic_score = None
         self.keywords = None
         self.taglines = None
@@ -108,6 +109,7 @@ class Movie(object):
         self.dutch_release_date = self.replace_if_not_none(self.str_to_arrow(movie_info.get('dutch_release_date')),
                                                            self.dutch_release_date)
         self.original_title = self.replace_if_not_none(movie_info.get('original_title'), self.original_title)
+        self.english_title = self.replace_if_not_none(movie_info.get('english_title'), self.english_title)
         self.metacritic_score = self.replace_if_not_none(movie_info.get('metacritic_score'), self.metacritic_score)
         self.keywords = self.replace_if_not_none(movie_info.get('keywords'), self.keywords)
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
