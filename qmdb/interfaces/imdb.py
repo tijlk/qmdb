@@ -111,6 +111,8 @@ class IMDBScraper(Scraper):
                 'tags': tags}
 
     def get_release_date(self, release_data):
+        if release_data is None:
+            return None, None
         releases = [self.process_release_date(reldate) for reldate in release_data]
         dutch_release_dates = [release for release in releases if release['country'] == 'Netherlands']
         if len(dutch_release_dates) > 0:
@@ -183,7 +185,7 @@ class IMDBScraper(Scraper):
             print("ERROR: Could not download release information from IMDb.")
             return None
         info = dict()
-        original_release_date, dutch_release_date = self.get_release_date(release_info['release dates'])
+        original_release_date, dutch_release_date = self.get_release_date(release_info.get('release dates'))
         info['original_release_date'] = original_release_date
         info['dutch_release_date'] = dutch_release_date
         if 'akas from release info' in release_info:

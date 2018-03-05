@@ -136,6 +136,10 @@ def test_get_release_data():
     original_release_date, dutch_release_date = imdb_scraper.get_release_date(release_info)
     assert original_release_date == arrow.get(dt.datetime(1999, 3, 27))
     assert dutch_release_date is None
+    release_info = None
+    original_release_date, dutch_release_date = imdb_scraper.get_release_date(release_info)
+    assert original_release_date is None
+    assert dutch_release_date is None
 
 
 @patch.object(IMDbHTTPAccessSystem, 'get_movie_release_dates',
