@@ -1,5 +1,4 @@
-from qmdb.database.database import MySQLDatabase, MovieNotInDatabaseError
-from qmdb.movie.movie import Movie
+from qmdb.database.database import MySQLDatabase
 from qmdb.interfaces.omdb import OMDBScraper
 from qmdb.interfaces.criticker import CritickerScraper
 from qmdb.interfaces.updater import Updater
@@ -10,8 +9,8 @@ if __name__ == "__main__":
     omdb_scraper = OMDBScraper()
     crit_scraper = CritickerScraper(user='tijl')
     updater = Updater()
-    #crit_scraper.get_movies(db, start_popularity=2)
-    #crit_scraper.get_ratings(db)
+    crit_scraper.get_movies(db, start_popularity=2)
+    crit_scraper.get_ratings(db)
 
     print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")
     while True:

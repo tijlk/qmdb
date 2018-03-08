@@ -135,3 +135,5 @@ class Movie(object):
             self.str_to_arrow(movie_info.get('imdb_vote_details_updated')), self.imdb_vote_details_updated)
         self.omdb_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('omdb_updated')),
                                                      self.omdb_updated)
+        self.imdb_plot_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('imdb_plot_updated')),
+                                                          self.imdb_plot_updated)
