@@ -9,27 +9,8 @@ from qmdb.database.database import MySQLDatabase
 from qmdb.interfaces.criticker import CritickerScraper
 from qmdb.interfaces.omdb import OMDBScraper
 from qmdb.interfaces.updater import Updater
-from qmdb.movie.utils import humanized_time
-from qmdb.utils.utils import create_copy_of_table
-from qmdb.utils.utils import no_internet
-import mock
-import pytest
-from pytest_mock import mocker
 from qmdb.test.test_utils import create_test_tables, remove_test_tables
-
-
-def test_get_movies_stats():
-    db = MySQLDatabase()
-    updater = Updater()
-    updater.get_movies_stats(db)
-    print(updater.years)
-    print(updater.crit_pop)
-    movie = db.movies[49141]
-    print(humanized_time(movie.date_added), humanized_time(movie.criticker_updated), humanized_time(movie.omdb_updated))
-    updates = updater.calculate_next_updates(movie)
-    print(updates)
-    for update in updates:
-        print(humanized_time(update['next_update']))
+from qmdb.utils.utils import no_internet
 
 
 def test_calculate_frequency_score():
@@ -78,7 +59,7 @@ def test_calculate_next_update():
 @patch.object(arrow, 'now', lambda: arrow.get('2019-01-01 00:00:00+01:00'))
 def test_get_update_sequence():
     create_test_tables(variant='updates')
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='tst')
     updater = Updater()
     updater.get_movies_stats(db)
     seq = updater.get_all_next_updates(db, weibull_lambda=10000)
@@ -93,7 +74,7 @@ def test_get_update_sequence():
 @pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
 def test_update_source():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='tst')
     updater = Updater()
     crit_id = 1234
     updater.update_source(db, {'source': 'criticker', 'crit_id': crit_id})
@@ -120,7 +101,7 @@ def test_update_movies(mocker):
     mocker.patch.object(time, 'sleep', lambda x: None)
     mocker.patch.object(Updater, 'update_source', lambda x, y, z: None)
     create_test_tables(variant='updates')
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='tst')
     updater = Updater()
     updater.update_movies(db, weibull_lambda=10000)
     # TODO: change this unit test to test get_update_sequence, assert timings of next updates

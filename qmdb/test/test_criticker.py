@@ -29,8 +29,8 @@ def test_get_movie_info():
     assert movie_info['imdbid'] == 133093
     assert movie_info['crit_rating'] == pytest.approx(7.71, 0.3)
     assert movie_info['crit_votes'] == pytest.approx(27493, 1000)
-    assert movie_info['crit_myratings']['tijl'] == 93
-    assert movie_info['crit_mypsis']['tijl'] == pytest.approx(80, 10)
+    assert movie_info['my_ratings']['tijl']['rating'] == 93
+    assert movie_info['my_ratings']['tijl']['psi'] == pytest.approx(80, 10)
     assert movie_info['trailer_url'] == 'https://www.youtube.com/watch?v=vKQi3bBA1y8'
 
 
@@ -49,7 +49,7 @@ def test_get_movie_info_no_rating_of_my_own():
         m.get('http://www.criticker.com/film/The-Mask/',
               text=read_file('test/fixtures/criticker-the-mask.html'))
         movie_info = crit_scraper.get_movie_info('http://www.criticker.com/film/The-Mask/')
-    assert movie_info.get('crit_myratings') is None
+    assert movie_info['my_ratings']['tijl'].get('rating') is None
 
 
 def test_get_movie_info_no_poster():
@@ -81,8 +81,8 @@ def test_get_movielist_movie_attributes():
     raw_html = read_file('test/fixtures/criticker-normal-movie-in-movie-list.html')
     html_info = BeautifulSoup(raw_html, "lxml").find('li')
     movie_info = crit_scraper.get_movielist_movie_attributes(html_info)
-    assert set(movie_info.keys()) == {'crit_id', 'crit_url', 'title', 'year', 'date_added', 'crit_mypsis'}
-    assert movie_info['crit_mypsis'] == {'tijl': 55}
+    assert set(movie_info.keys()) == {'crit_id', 'crit_url', 'title', 'year', 'date_added', 'my_ratings'}
+    assert movie_info['my_ratings']['tijl'] == {'psi': 55}
     assert movie_info['crit_id'] == 26496
     assert movie_info['crit_url'] == 'https://www.criticker.com/film/Issiz-adam/'
     assert movie_info['title'] == 'Issiz adam'
@@ -93,8 +93,8 @@ def test_get_movielist_movie_attributes():
     raw_html = read_file('test/fixtures/criticker-rated-movie-in-movie-list.html')
     html_info = BeautifulSoup(raw_html, "lxml").find('li')
     movie_info = crit_scraper.get_movielist_movie_attributes(html_info)
-    assert set(movie_info.keys()) == {'crit_id', 'crit_url', 'title', 'year', 'date_added', 'crit_myratings'}
-    assert movie_info['crit_myratings'] == {'tijl': 61}
+    assert set(movie_info.keys()) == {'crit_id', 'crit_url', 'title', 'year', 'date_added', 'my_ratings'}
+    assert movie_info['my_ratings']['tijl'] == {'rating': 61}
 
     raw_html = read_file('test/fixtures/criticker-nopsi-movie-in-movie-list.html')
     html_info = BeautifulSoup(raw_html, "lxml").find('li')

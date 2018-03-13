@@ -84,10 +84,17 @@ class CritickerScraper(Scraper):
                       'trailer_url': trailer_url,
                       'crit_rating': crit_rating,
                       'crit_votes': crit_votes}
-        if my_rating is not None:
-            movie_info['crit_myratings'] = {self.user: my_rating}
-        if my_psi is not None:
-            movie_info['crit_mypsis'] = {self.user: my_psi}
+
+        movie_info = self.add_psi_and_rating_to_movie_info(movie_info, rating=my_rating, psi=my_psi)
+        return movie_info
+
+    def add_psi_and_rating_to_movie_info(self, movie_info, rating=None, psi=None):
+        if rating is not None or psi is not None:
+            movie_info['my_ratings'] = {self.user: dict()}
+            if rating is not None:
+                movie_info['my_ratings'][self.user].update({'rating': rating})
+            if psi is not None:
+                movie_info['my_ratings'][self.user].update({'psi': psi})
         return movie_info
 
     @staticmethod
@@ -120,17 +127,14 @@ class CritickerScraper(Scraper):
         if popularity is not None and pagenr is not None and nr_pages is not None:
             movie_info.update({'crit_popularity': popularity - (pagenr - 1)/(nr_pages - 1)})
         try:
-            psi = {self.user: int(movie_html.find('div', attrs={'class': 'pti'}).text)}
+            psi = int(movie_html.find('div', attrs={'class': 'pti'}).text)
         except AttributeError:
             psi = None
-        if psi is not None:
-            movie_info.update({'crit_mypsis': psi})
         try:
-            rating = {self.user: int(movie_html.find('div', attrs={'title': 'Your Ranking'}).text)}
+            rating = int(movie_html.find('div', attrs={'title': 'Your Ranking'}).text)
         except AttributeError:
             rating = None
-        if rating is not None:
-            movie_info.update({'crit_myratings': rating})
+        movie_info = self.add_psi_and_rating_to_movie_info(movie_info, rating=rating, psi=psi)
         return movie_info
 
     def get_movie_list_html(self, url):

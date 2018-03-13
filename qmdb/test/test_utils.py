@@ -4,8 +4,8 @@ import mock
 import pickle
 
 
-def create_test_tables(variant='normal'):
-    db = MySQLDatabase(schema='qmdb_test', from_scratch=True)
+def create_test_tables(variant='normal', env='tst'):
+    db = MySQLDatabase(schema='qmdb_test', from_scratch=True, env=env)
     if variant == 'normal':
         movies_records = [{'crit_id': 1234,
                            'crit_popularity': 10,

@@ -2,16 +2,15 @@ import arrow
 import pytest
 
 from qmdb.database.database import MySQLDatabase, MovieNotInDatabaseError
-from qmdb.movie.movie import Movie
-from qmdb.utils.utils import create_copy_of_table
-import pymysql
-from qmdb.test.test_utils import create_test_tables, remove_test_tables
 from qmdb.interfaces.imdb import IMDBScraper
+from qmdb.movie.movie import Movie
+from qmdb.test.test_utils import create_test_tables, remove_test_tables
+from qmdb.utils.utils import no_internet
 
 
 def test_database_init_existing_file():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     assert db.c is not None
     assert isinstance(db.movies, dict)
     print(db.movies.keys())
@@ -20,7 +19,7 @@ def test_database_init_existing_file():
 
 
 def test_database_init_from_scratch_new():
-    db = MySQLDatabase(schema='qmdb_test', from_scratch=True)
+    db = MySQLDatabase(schema='qmdb_test', from_scratch=True, env='test')
     assert db.c is not None
     assert isinstance(db.movies, dict)
     print(db.movies.keys())
@@ -30,16 +29,16 @@ def test_database_init_from_scratch_new():
 
 def test_database_init_from_scratch_existing():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     assert list(db.movies.keys()) == [1234, 49141]
-    db = MySQLDatabase(schema='qmdb_test', from_scratch=True)
+    db = MySQLDatabase(schema='qmdb_test', from_scratch=True, env='test')
     assert list(db.movies.keys()) == []
     remove_test_tables(db)
 
 
 def test_add_new_movie():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     new_movie = {'crit_id': 12345,
                  'crit_popularity_page': 1,
                  'crit_url': 'blahblah',
@@ -47,7 +46,7 @@ def test_add_new_movie():
                  'poster_url': 'http://blahblah',
                  'date_added': arrow.now()}
     db.set_movie(Movie(new_movie))
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     assert 12345 in list(db.movies.keys())
     assert db.movies[12345].title == 'Pulp Fiction'
     remove_test_tables(db)
@@ -55,7 +54,7 @@ def test_add_new_movie():
 
 def test_add_weird_movie():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     new_movie = {'crit_id': 60326,
                  'crit_popularity_page': 79,
                  'crit_url': 'https://www.criticker.com/film/alg305-cengi/',
@@ -63,7 +62,7 @@ def test_add_weird_movie():
                  'year': 2011,
                  'date_added': arrow.now()}
     db.set_movie(Movie(new_movie))
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     assert 60326 in list(db.movies.keys())
     assert db.movies[60326].title == 'Çalgı çengi'
     remove_test_tables(db)
@@ -71,7 +70,7 @@ def test_add_weird_movie():
 
 def test_update_existing_movie():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     existing_movie = {'crit_id': 1234,
                       'title': 'The Matrix 2',
                       'genres': ['Action', 'Sci-Fi']}
@@ -84,7 +83,7 @@ def test_update_existing_movie():
     db.close()
     assert set([result['genre'] for result in results]) == {'Action', 'Sci-Fi'}
     assert db.movies[1234].year == 1999
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     assert 1234 in list(db.movies.keys())
     assert db.movies[1234].title == 'The Matrix 2'
     assert db.movies[1234].year == 1999
@@ -94,7 +93,7 @@ def test_update_existing_movie():
 
 def test_get_existing_movie():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     movie = db.get_movie(1234)
     assert movie.title == 'The Matrix'
     assert movie.year == 1999
@@ -103,7 +102,7 @@ def test_get_existing_movie():
 
 def test_get_non_existent_movie():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     with pytest.raises(MovieNotInDatabaseError) as e_info:
         movie = db.get_movie(12345)
     remove_test_tables(db)
@@ -111,7 +110,7 @@ def test_get_non_existent_movie():
 
 def test_add_column():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     db.add_column('test_column', 'mediumint', table_name='movies', after='crit_id')
     db.connect()
     db.c.execute("""
@@ -130,7 +129,7 @@ def test_add_column():
 
 def test_add_columns(mocker):
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     mocker.patch.object(db, 'add_column')
     db.add_columns([{'column_name': 'test_column1', 'column_datatype': 'mediumint'},
                     {'column_name': 'test_column2', 'column_datatype': 'bigint'}],
@@ -149,7 +148,7 @@ def test_add_columns(mocker):
 
 def test_create_insert_multiple_records_sql():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     d = {'crit_id': 123,
          'n_rows': 3,
          'rank': [1, 2, 3],
@@ -160,7 +159,7 @@ def test_create_insert_multiple_records_sql():
 
 def test_movie_to_dict_languages():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     movie = Movie({'crit_id': 1234, 'languages': ['English', 'Spanish']})
     d = db.movie_to_dict_languages(movie)
     assert d == {'crit_id': 1234,
@@ -171,7 +170,7 @@ def test_movie_to_dict_languages():
 
 def test_update_multiple_records():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     d = {'crit_id': 1234,
          'n_rows': 2,
          'language': ['English', 'Spanish'],
@@ -185,7 +184,7 @@ def test_update_multiple_records():
 
 def test_load_languages(mocker):
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     mocker.patch.object(db, 'load_or_initialize', lambda x: None)
     movies = {1234: dict(),
               49141: dict()}
@@ -199,7 +198,7 @@ def test_load_languages(mocker):
 
 def test_load_persons(mocker):
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     mocker.patch.object(db, 'load_or_initialize', lambda x: None)
     movies = {1234: dict(),
               49141: dict()}
@@ -213,9 +212,10 @@ def test_load_persons(mocker):
     remove_test_tables(db)
 
 
+@pytest.mark.skipif(no_internet(), reason='There is no internet connection.')
 def test_parse_store_load_persons():
     create_test_tables()
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     imdb_scraper = IMDBScraper()
     imdbid = '3315342'
     movie_info = imdb_scraper.process_main_info(imdbid)
@@ -226,7 +226,7 @@ def test_parse_store_load_persons():
                        'date_added': '2018-01-01'})
     movie = Movie(movie_info)
     db.set_movie(movie)
-    db = MySQLDatabase(schema='qmdb_test')
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     assert db.movies[1234].cast[0]['name'] == 'Hugh Jackman'
     assert db.movies[1234].director[0]['name'] == 'James Mangold'
     assert db.movies[1234].writer[1]['name'] == 'Scott Frank'

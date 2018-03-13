@@ -1,12 +1,12 @@
-import sqlite3
-import os
-from qmdb.movie.movie import Movie
-from arrow import Arrow
-import arrow
 import copy
-from qmdb.config import config
-import pymysql.cursors
 from itertools import groupby
+
+import arrow
+import pymysql.cursors
+from arrow import Arrow
+
+from qmdb.config import config
+from qmdb.movie.movie import Movie
 
 
 class Database:
@@ -61,7 +61,11 @@ class Database:
 
 
 class MySQLDatabase(Database):
-    def __init__(self, from_scratch=False, schema='qmdb'):
+    def __init__(self, from_scratch=False, schema='qmdb', env='prd'):
+        if env == 'prd':
+            self.config = config.mysql_prd
+        else:
+            self.config = config.mysql_tst
         self.schema = schema
         self.columns_movies = {
             'crit_id': 'mediumint unsigned not null',
@@ -127,7 +131,7 @@ class MySQLDatabase(Database):
         }
         self.columns_taglines = {
             'crit_id': 'mediumint unsigned not null',
-            'tagline': 'varchar(512) not null',
+            'tagline': 'varchar(1024) not null',
             'rank': 'smallint unsigned not null'
         }
         self.columns_vote_details = {
@@ -139,12 +143,8 @@ class MySQLDatabase(Database):
         self.columns_ratings = {
             'crit_id': 'mediumint unsigned not null',
             'user': 'varchar(64) not null',
-            'rating': 'smallint not null'
-        }
-        self.columns_psis = {
-            'crit_id': 'mediumint unsigned not null',
-            'user': 'varchar(64) not null',
-            'psi': 'smallint not null'
+            'type': 'varchar(32) not null',
+            'score': 'float'
         }
         super().__init__(from_scratch=from_scratch)
 
@@ -159,9 +159,9 @@ class MySQLDatabase(Database):
                 raise Exception
 
     def connect(self, from_scratch=False):
-        self.conn = pymysql.connect(host=config.mysql['host'],
-                                    user=config.mysql['username'],
-                                    password=config.mysql['password'],
+        self.conn = pymysql.connect(host=self.config['host'],
+                                    user=self.config['username'],
+                                    password=self.config['password'],
                                     db=self.schema,
                                     charset='utf8mb4',
                                     use_unicode=True,
@@ -197,8 +197,7 @@ class MySQLDatabase(Database):
         self.create_table('keywords', self.columns_keywords, ['crit_id', 'keyword'], ['keyword'])
         self.create_table('taglines', self.columns_taglines, ['crit_id', 'rank'], ['rank'])
         self.create_table('vote_details', self.columns_vote_details, ['crit_id', 'demographic'], ['demographic'])
-        self.create_table('ratings', self.columns_ratings, ['crit_id', 'user'], ['user'])
-        self.create_table('psis', self.columns_psis, ['crit_id', 'user'], ['user'])
+        self.create_table('ratings', self.columns_ratings, ['crit_id', 'user', 'type'], ['user', 'type'])
         self.close()
 
     def load(self, verbose=False):
@@ -212,7 +211,6 @@ class MySQLDatabase(Database):
         self.load_taglines(movies)
         self.load_vote_details(movies)
         self.load_ratings(movies)
-        self.load_psis(movies)
         self.everything_to_movie(movies)
         self.close()
         if verbose:
@@ -303,16 +301,10 @@ class MySQLDatabase(Database):
 
     def load_ratings(self, movies):
         ratings = sorted(self.load_table('ratings'), key=lambda k: k['crit_id'])
-        ratings_dict = {k: {'crit_myratings': {e['user']: e['rating'] for e in list(v)}}
-                        for k, v in groupby(ratings, key=lambda x: x['crit_id'])}
+        ratings_dict = {crit_id: {'my_ratings': {user: {rating['type']: rating['score'] for rating in list(user_ratings)}
+                                                 for user, user_ratings in groupby(crit_values, key=lambda x: x['user'])}}
+                        for crit_id, crit_values in groupby(ratings, key=lambda x: x['crit_id'])}
         for k, v in ratings_dict.items():
-            movies[k].update(v)
-
-    def load_psis(self, movies):
-        psis = sorted(self.load_table('psis'), key=lambda k: k['crit_id'])
-        psis_dict = {k: {'crit_mypsis': {e['user']: e['psi'] for e in list(v)}}
-                        for k, v in groupby(psis, key=lambda x: x['crit_id'])}
-        for k, v in psis_dict.items():
             movies[k].update(v)
 
     def everything_to_movie(self, movies):
@@ -340,7 +332,6 @@ class MySQLDatabase(Database):
         self.update_multiple_records('keywords', self.movie_to_dict_keywords(movie))
         self.update_multiple_records('taglines', self.movie_to_dict_taglines(movie))
         self.update_multiple_records('ratings', self.movie_to_dict_ratings(movie))
-        self.update_multiple_records('psis', self.movie_to_dict_psis(movie))
         self.update_multiple_records('vote_details', self.movie_to_dict_vote_details(movie))
 
     def update_single_record(self, tbl, d):
@@ -356,7 +347,8 @@ class MySQLDatabase(Database):
         self.c.execute(sql, values)
         self.close()
 
-    def create_insert_multiple_records_sql(self, tbl, d):
+    @staticmethod
+    def create_insert_multiple_records_sql(tbl, d):
         keys = [key for key in list(d.keys()) if key not in ['crit_id', 'n_rows']]
         sql = "insert into {} (crit_id, {}) values ".format(tbl, ', '.join(keys))
         rows = []
@@ -534,26 +526,19 @@ class MySQLDatabase(Database):
         ratings_dict = {'crit_id': movie.crit_id,
                         'n_rows': 0,
                         'user': list(),
-                        'rating': list()}
-        ratings = movie.crit_myratings
+                        'type': list(),
+                        'score': list()}
+        ratings = movie.my_ratings
         if ratings is not None:
-            ratings_dict['user'] = list(ratings.keys())
-            ratings_dict['rating'] = [ratings[user] for user in ratings]
-            ratings_dict['n_rows'] = len(ratings)
+            records = []
+            for user in ratings:
+                for rating_type in ratings[user]:
+                    records.append({'user': user, 'type': rating_type, 'score': ratings[user][rating_type]})
+            ratings_dict['user'] = [r['user'] for r in records]
+            ratings_dict['type'] = [r['type'] for r in records]
+            ratings_dict['score'] = [r['score'] for r in records]
+            ratings_dict['n_rows'] = len(records)
         return ratings_dict
-
-    @staticmethod
-    def movie_to_dict_psis(movie):
-        psis_dict = {'crit_id': movie.crit_id,
-                     'n_rows': 0,
-                     'user': list(),
-                     'psi': list()}
-        psis = movie.crit_mypsis
-        if psis is not None:
-            psis_dict['user'] = list(psis.keys())
-            psis_dict['psi'] = [psis[user] for user in psis]
-            psis_dict['n_rows'] = len(psis)
-        return psis_dict
 
 
 class MovieNotInDatabaseError(Exception):
