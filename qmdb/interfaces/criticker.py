@@ -8,8 +8,6 @@ from requests import ConnectionError
 
 from qmdb.config import config
 from qmdb.interfaces.interfaces import Scraper
-from qmdb.movie.movie import Movie
-
 
 banned_movies = {154: 'Apocalypse Now Redux',
                  1011: "The Exorcist: The Version You've Never Seen"}
@@ -202,7 +200,7 @@ class CritickerScraper(Scraper):
         for popularity, year in reversed(popularity_year_tuples):
             movies += self.get_movies_of_popularity(popularity=popularity, min_year=year, debug=debug)
         print("\nSaving movie information to the database\n")
-        self.save_movies(db, movies)
+        db.save_movies(movies)
 
     def get_ratings_page(self, pagenr=1):
         criticker_url = 'https://www.criticker.com/rankings/?p={}'.format(pagenr)
@@ -217,11 +215,5 @@ class CritickerScraper(Scraper):
             print("   Getting page {} of {}".format(pagenr, nr_pages))
             new_movies, _ = self.get_ratings_page(pagenr=pagenr)
             movies += new_movies
-        print("\nSaving rating information to the database\n")
-        self.save_movies(db, movies)
+        db.save_movies(movies)
         return movies
-
-    def save_movies(self, db, movies):
-        for movie_info in movies:
-            db.set_movie(movie_info)
-        db.print()

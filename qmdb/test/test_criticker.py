@@ -6,7 +6,8 @@ from bs4 import BeautifulSoup, ResultSet, Tag
 from mock import patch
 
 from qmdb.interfaces.criticker import CritickerScraper
-from qmdb.test.test_utils import read_file, side_effect
+from qmdb.test.test_utils import read_file, side_effect, create_test_tables, remove_test_tables
+from qmdb.database.database import MySQLDatabase
 
 session = requests.Session()
 adapter = requests_mock.Adapter()
@@ -147,16 +148,18 @@ def test_fibonacci():
 
 @patch.object(arrow, 'now', new=side_effect(lambda: arrow.get('2018-01-01')))
 @patch.object(CritickerScraper, 'get_movies_of_popularity', new=side_effect(lambda **kwargs: [1]))
-@patch.object(CritickerScraper, 'save_movies')
+@patch.object(MySQLDatabase, 'save_movies')
 def test_get_movies(mocker):
+    create_test_tables()
+    db = MySQLDatabase(schema='qmdb_test', env='test')
     crit_scraper = CritickerScraper()
-    crit_scraper.get_movies('db', start_popularity=8)
-    save_movies_call_args = crit_scraper.save_movies.call_args_list[0][0]
-    assert save_movies_call_args[0] == 'db'
-    assert save_movies_call_args[1] == [1, 1, 1]
+    crit_scraper.get_movies(db, start_popularity=8)
+    save_movies_call_args = db.save_movies.call_args_list[0][0]
+    assert save_movies_call_args[0] == [1, 1, 1]
     assert crit_scraper.get_movies_of_popularity.call_args_list[0][1] ==\
            {'debug': False, 'min_year': 2013, 'popularity': 10}
     assert crit_scraper.get_movies_of_popularity.call_args_list[1][1] ==\
            {'debug': False, 'min_year': 2016, 'popularity': 9}
     assert crit_scraper.get_movies_of_popularity.call_args_list[2][1] ==\
            {'debug': False, 'min_year': 2018, 'popularity': 8}
+    remove_test_tables(db)

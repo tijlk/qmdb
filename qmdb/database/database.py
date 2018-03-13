@@ -1,4 +1,5 @@
 import copy
+import time
 from itertools import groupby
 
 import arrow
@@ -225,10 +226,12 @@ class MySQLDatabase(Database):
         return self.c.fetchall()
 
     def load_movies(self):
+        print("Loading movies...")
         movies = self.load_table('movies')
         return {movie['crit_id']: movie for movie in movies}
 
     def load_persons(self, movies):
+        print("Loading people...")
         persons = sorted(self.load_table('persons'),
                          key=lambda k: (k['crit_id'], k['role'], k['rank']))
         cast = [person for person in persons if person['role'] == 'cast']
@@ -257,6 +260,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def load_genres(self, movies):
+        print("Loading genres...")
         genres = sorted(self.load_table('genres'), key=lambda k: k['crit_id'])
         genre_dict = {k: {'genres': [e['genre'] for e in list(v)]}
                       for k, v in groupby(genres, key=lambda x: x['crit_id'])}
@@ -264,6 +268,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def load_countries(self, movies):
+        print("Loading countries...")
         countries = sorted(self.load_table('countries'), key=lambda k: (k['crit_id'], k['rank']))
         country_dict = {k: {'countries': [e['country'] for e in list(v)]}
                         for k, v in groupby(countries, key=lambda x: x['crit_id'])}
@@ -271,6 +276,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def load_languages(self, movies):
+        print("Loading languages...")
         languages = sorted(self.load_table('languages'), key=lambda k: (k['crit_id'], k['rank']))
         language_dict = {k: {'languages': [e['language'] for e in list(v)]}
                          for k, v in groupby(languages, key=lambda x: x['crit_id'])}
@@ -278,6 +284,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def load_keywords(self, movies):
+        print("Loading keywords...")
         keywords = sorted(self.load_table('keywords'), key=lambda k: k['crit_id'])
         keyword_dict = {k: {'keywords': [e['keyword'] for e in list(v)]}
                         for k, v in groupby(keywords, key=lambda x: x['crit_id'])}
@@ -285,6 +292,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def load_taglines(self, movies):
+        print("Loading taglines...")
         taglines = sorted(self.load_table('taglines'), key=lambda k: (k['crit_id'], k['rank']))
         taglines_dict = {k: {'taglines': [e['tagline'] for e in list(v)]}
                          for k, v in groupby(taglines, key=lambda x: x['crit_id'])}
@@ -292,6 +300,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def load_vote_details(self, movies):
+        print("Loading vote details...")
         vote_details = sorted(self.load_table('vote_details'), key=lambda k: k['crit_id'])
         vote_details_dict = {k: {'vote_details': {e['demographic']: {'rating': e['rating'], 'votes': e['votes']}
                                                   for e in list(v)}}
@@ -300,6 +309,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def load_ratings(self, movies):
+        print("Loading ratings...")
         ratings = sorted(self.load_table('ratings'), key=lambda k: k['crit_id'])
         ratings_dict = {crit_id: {'my_ratings': {user: {rating['type']: rating['score'] for rating in list(user_ratings)}
                                                  for user, user_ratings in groupby(crit_values, key=lambda x: x['user'])}}
@@ -308,6 +318,7 @@ class MySQLDatabase(Database):
             movies[k].update(v)
 
     def everything_to_movie(self, movies):
+        print("Creating Movie objects...")
         for movie_info in movies.values():
             self.movies[movie_info['crit_id']] = Movie(movie_info)
 
@@ -539,6 +550,15 @@ class MySQLDatabase(Database):
             ratings_dict['score'] = [r['score'] for r in records]
             ratings_dict['n_rows'] = len(records)
         return ratings_dict
+
+    def save_movies(self, movies):
+        print("\nSaving movie information to the database...\n")
+        time0 = time.time()
+        for i, movie_info in enumerate(movies):
+            self.set_movie(movie_info)
+        time_taken = time.time() - time0
+        print("...took {:.1f} minuters".format(time_taken/60))
+        self.print()
 
 
 class MovieNotInDatabaseError(Exception):
