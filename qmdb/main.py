@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     #crit_scraper.get_movies(db, start_popularity=2)
     #crit_scraper.get_ratings(db)
-    #modeler.get_predictions()
+    modeler.get_predictions()
 
     print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")
     while True:
