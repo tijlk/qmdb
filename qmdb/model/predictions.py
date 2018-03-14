@@ -251,9 +251,9 @@ class RatingModeler:
         scored_movies['show'] = scored_movies.apply(lambda row: 1 if row['pred_seeit'] >= row['random'] else 0, axis=1)
         scored_movies['score'] = scored_movies.apply(
             lambda row: np.power(row['pred_seeit'] * (row['pred_rating'] / 100) ** 3, 1 / 4) * 100, axis=1)
-        movie_dicts = [{'crit_id': i,
-                        'my_ratings': {'tijl': {'seen_probability': row['seen_probability'],
-                                                'pred_rating': row['pred_rating'],
-                                                'pred_seeit': row['pred_seeit'],
-                                                'pred_score': row['score']}}} for i, row in scored_movies.iterrows()]
+        movie_dicts = [{'crit_id': int(i),
+                        'my_ratings': {'tijl': {'seen_probability': float(row['seen_probability']),
+                                                'pred_rating': float(row['pred_rating']),
+                                                'pred_seeit': float(row['pred_seeit']),
+                                                'pred_score': float(row['score'])}}} for i, row in scored_movies.iterrows()]
         self.db.save_movies(movie_dicts)
