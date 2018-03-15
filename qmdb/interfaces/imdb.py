@@ -114,6 +114,7 @@ class IMDBScraper(Scraper):
         if release_data is None:
             return None, None
         releases = [self.process_release_date(reldate) for reldate in release_data]
+        releases = [release for release in releases if release['tags'] is None or 're-release' not in release['tags']]
         dutch_release_dates = [release for release in releases if release['country'] == 'Netherlands']
         if len(dutch_release_dates) > 0:
             normal_dutch_release_dates = [release for release in dutch_release_dates if release['tags'] is None]

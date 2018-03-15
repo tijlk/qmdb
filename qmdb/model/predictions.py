@@ -1,16 +1,13 @@
-import sys
-from qmdb.database.database import MySQLDatabase
-from sklearn.feature_extraction import DictVectorizer
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.model_selection import cross_val_score, GridSearchCV, train_test_split
-from sklearn.metrics import mean_squared_error, roc_auc_score, r2_score
-from sklearn.pipeline import Pipeline
-import pandas as pd
-import numpy as np
-from sklearn.preprocessing import Imputer
 import arrow
+import numpy as np
+import pandas as pd
 from scipy.stats import weibull_min
-from qmdb.movie.movie import Movie
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.feature_extraction import DictVectorizer
+from sklearn.metrics import mean_squared_error, roc_auc_score, r2_score
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import Imputer
 
 
 def ifnull(var, val):

@@ -131,6 +131,14 @@ def test_get_release_data():
     original_release_date, dutch_release_date = imdb_scraper.get_release_date(release_info)
     assert original_release_date == arrow.get(dt.datetime(1999, 3, 27))
     assert dutch_release_date == arrow.get(dt.datetime(1999, 4, 5))
+    release_info = ['Italy::21 December 1968',
+                    'Italy::24 December 1968 (Turin)',
+                    'USA::28 May 1969 (New York, New York City)',
+                    'USA::4 July 1969',
+                    'Netherlands::3 November 2016 (re-release)']
+    original_release_date, dutch_release_date = imdb_scraper.get_release_date(release_info)
+    assert original_release_date == arrow.get(dt.datetime(1968, 12, 21))
+    assert dutch_release_date is None
     release_info = ['Afghanistan::29 March 1999',
                     'Bangladesh::27 March 1999']
     original_release_date, dutch_release_date = imdb_scraper.get_release_date(release_info)

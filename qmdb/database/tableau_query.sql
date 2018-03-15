@@ -38,9 +38,11 @@ SELECT m.crit_id,
        d.directors,
        w.writers,
        r.rating_tijl,
-       r.rating_renate,
-       p.psi_tijl,
-       p.psi_renate
+       r.psi_tijl,
+       r.pred_rating_tijl,
+       r.pred_seeit_tijl,
+       r.pred_score_tijl,
+       r.seen_probability_tijl
   from qmdb.movies as m
        left join (select crit_id,
                          group_concat(genre separator ' / ') as genres
@@ -79,18 +81,12 @@ SELECT m.crit_id,
                    group by crit_id) as w
               on m.crit_id = w.crit_id
        left join (select crit_id,
-                         avg(case when user = 'tijl' then rating else null end) as rating_tijl,
-                         avg(case when user = 'renate' then rating else null end) as rating_renate
+                         avg(case when user = 'tijl' and type = 'rating' then score else null end) as rating_tijl,
+                         avg(case when user = 'tijl' and type = 'psi' then score else null end) as psi_tijl,
+                         avg(case when user = 'tijl' and type = 'pred_rating' then score else null end) as pred_rating_tijl,
+                         avg(case when user = 'tijl' and type = 'pred_seeit' then score else null end) as pred_seeit_tijl,
+                         avg(case when user = 'tijl' and type = 'seen_probability' then score else null end) as seen_probability_tijl,
+                         avg(case when user = 'tijl' and type = 'pred_score' then score else null end) as pred_score_tijl
                     from qmdb.ratings
                    group by crit_id) as r
               on m.crit_id = r.crit_id
-       left join (select crit_id,
-                         avg(case when user = 'tijl' then psi else null end) as psi_tijl,
-                         avg(case when user = 'renate' then psi else null end) as psi_renate
-                    from qmdb.psis
-                   group by crit_id) as p
-              on m.crit_id = p.crit_id
-
-
-
-
