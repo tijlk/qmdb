@@ -3,6 +3,7 @@ from qmdb.interfaces.omdb import OMDBScraper
 from qmdb.interfaces.criticker import CritickerScraper
 from qmdb.interfaces.updater import Updater
 from qmdb.model.predictions import RatingModeler
+import time
 
 
 if __name__ == "__main__":
@@ -12,11 +13,11 @@ if __name__ == "__main__":
     updater = Updater()
     modeler = RatingModeler(db)
 
-    #crit_scraper.get_movies(db, start_popularity=2)
-    #crit_scraper.get_ratings(db)
-    modeler.get_predictions()
-
-    print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")
     while True:
-        updater.update_movies(db, n=30, weibull_lambda=3)
-    db.print()
+        crit_scraper.get_movies(db, start_popularity=2)
+        print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")
+        time0 = time.time()
+        while time.time() - time0 <= 12*3600:
+            updater.update_movies(db, n=30, weibull_lambda=3)
+        crit_scraper.get_ratings(db)
+        modeler.get_predictions()
