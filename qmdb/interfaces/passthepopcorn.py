@@ -1,9 +1,10 @@
-from qmdb.config import config
-import requests
 import json
-from json import JSONDecodeError
-from qmdb.interfaces.interfaces import Scraper
+
 import arrow
+import requests
+
+from qmdb.config import config
+from qmdb.interfaces.interfaces import Scraper
 
 
 class PassThePopcornScraper(Scraper):
@@ -16,8 +17,8 @@ class PassThePopcornScraper(Scraper):
 
     def create_session(self):
         self.session.post("https://passthepopcorn.me/ajax.php?action=login",
-                               data={"username": self.username, "password": self.password, "passkey": self.passkey,
-                                     "keeplogged": "0", "login": "Login"}, allow_redirects=False)
+                          data={"username": self.username, "password": self.password, "passkey": self.passkey,
+                                "keeplogged": "0", "login": "Login"}, allow_redirects=False)
 
     def refresh_movie(self, movie):
         super().refresh_movie(movie)
