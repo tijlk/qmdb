@@ -25,7 +25,7 @@ class PassThePopcornScraper(Scraper):
         movie_info = self.get_movie_info(movie.imdbid)
         movie_info['crit_id'] = movie.crit_id
         if isinstance(movie_info, dict):
-            movie_info['ptp_updated']: arrow.now()
+            movie_info['ptp_updated'] = arrow.now()
             movie.update_from_dict(movie_info)
             return movie
         else:
