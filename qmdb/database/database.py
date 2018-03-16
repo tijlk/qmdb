@@ -93,6 +93,8 @@ class MySQLDatabase(Database):
             'tomato_url': 'varchar(256)',
             'poster_url': 'varchar(256)',
             'trailer_url': 'varchar(256)',
+            'ptp_url': 'varchar(64)',
+            'ptp_hd_available': 'tinyint unsigned',
             'date_added': 'varchar(32) not null',
             'criticker_updated': 'varchar(32)',
             'imdb_main_updated': 'varchar(32)',
@@ -102,7 +104,8 @@ class MySQLDatabase(Database):
             'imdb_taglines_updated': 'varchar(32)',
             'imdb_vote_details_updated': 'varchar(32)',
             'imdb_plot_updated': 'varchar(32)',
-            'omdb_updated': 'varchar(32)'
+            'omdb_updated': 'varchar(32)',
+            'ptp_updated': 'varchar(32)'
         }
         self.columns_persons = {
             'crit_id': 'mediumint unsigned not null',

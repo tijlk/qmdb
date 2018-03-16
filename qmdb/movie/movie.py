@@ -37,6 +37,8 @@ class Movie(object):
         self.keywords = None
         self.taglines = None
         self.vote_details = None
+        self.ptp_url = None
+        self.ptp_hd_available = None
         self.date_added = None
         self.criticker_updated = None
         self.imdb_main_updated = None
@@ -47,6 +49,7 @@ class Movie(object):
         self.imdb_vote_details_updated = None
         self.imdb_plot_updated = None
         self.omdb_updated = None
+        self.ptp_updated = None
         self.my_ratings = dict()
         self.update_from_dict(movie_info)
 
@@ -113,6 +116,8 @@ class Movie(object):
         self.keywords = self.replace_if_not_none(movie_info.get('keywords'), self.keywords)
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
         self.vote_details = self.replace_if_not_none(movie_info.get('vote_details'), self.vote_details)
+        self.ptp_url = self.replace_if_not_none(movie_info.get('ptp_url'), self.ptp_url)
+        self.ptp_hd_available = self.replace_if_not_none(bool(movie_info.get('ptp_hd_available')), self.ptp_hd_available)
         if movie_info.get('my_ratings') is not None:
             for user in movie_info.get('my_ratings'):
                 if user in self.my_ratings:
@@ -138,3 +143,5 @@ class Movie(object):
                                                      self.omdb_updated)
         self.imdb_plot_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('imdb_plot_updated')),
                                                           self.imdb_plot_updated)
+        self.ptp_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('ptp_updated')),
+                                                    self.ptp_updated)

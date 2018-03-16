@@ -1,6 +1,7 @@
 from qmdb.interfaces.criticker import CritickerScraper
 from qmdb.interfaces.omdb import OMDBScraper
 from qmdb.interfaces.imdb import IMDBScraper
+from qmdb.interfaces.passthepopcorn import PassThePopcornScraper
 from operator import itemgetter
 import numpy as np
 import arrow
@@ -13,7 +14,7 @@ from qmdb.movie.movie import Movie
 class Updater(object):
     def __init__(self, **kwargs):
         self.sources = ['criticker', 'omdb', 'imdb_main', 'imdb_release', 'imdb_metacritic', 'imdb_keywords',
-                        'imdb_taglines', 'imdb_vote_details', 'imdb_plot']
+                        'imdb_taglines', 'imdb_vote_details', 'imdb_plot', 'ptp']
         self.multipliers = {'base_multiplier': 1,
                             'base_multiplier_criticker': 1,
                             'base_multiplier_omdb': 10,
@@ -24,6 +25,7 @@ class Updater(object):
                             'base_multiplier_imdb_taglines': 10,
                             'base_multiplier_imdb_vote_details': 2,
                             'base_multiplier_imdb_plot': 10,
+                            'base_multiplier_ptp': 1,
                             'firsttime_speedup': 50000}
         self.multipliers.update(kwargs)
         for source in self.sources:
@@ -35,12 +37,14 @@ class Updater(object):
         self.crit_scraper = CritickerScraper()
         self.omdb_scraper = OMDBScraper()
         self.imdb_scraper = IMDBScraper()
+        self.ptp_scraper = PassThePopcornScraper()
         self.years = None
         self.crit_pop = None
         self.earliest_date_added = None
         self.max_connections_per_hour = {'criticker': 400,
                                          'omdb': 40,
-                                         'imdb': 800}
+                                         'imdb': 800,
+                                         'ptp': 400}
 
     def update_movies(self, db, n=None, weibull_lambda=1.5):
         self.get_movies_stats(db)
@@ -48,7 +52,8 @@ class Updater(object):
         crit_updates = self.get_source_update_sequence(updates, 'criticker')
         omdb_updates = self.get_source_update_sequence(updates, 'omdb')
         imdb_updates = self.get_source_update_sequence(updates, 'imdb')
-        sorted_seq = sorted(crit_updates + omdb_updates + imdb_updates, key=itemgetter('next_update'))
+        ptp_updates = self.get_source_update_sequence(updates, 'ptp')
+        sorted_seq = sorted(crit_updates + omdb_updates + imdb_updates + ptp_updates, key=itemgetter('next_update'))
         if n is not None:
             sources_to_update = sorted_seq[:n]
         else:
@@ -114,7 +119,7 @@ class Updater(object):
 
         update_periods = {}
         for source in self.sources:
-            if (source == 'omdb' or source.startswith('imdb')) and movie.imdbid is None:
+            if (source in ('omdb', 'ptp') or source.startswith('imdb')) and movie.imdbid is None:
                 break
             update_periods[source] = dict()
             update_periods[source]['source'] = source
@@ -138,8 +143,8 @@ class Updater(object):
     def calculate_update_period(year_period_score, crit_pop_period_score, year_power=1,
                                 crit_pop_power=1):
         period = np.exp((year_power * np.log(year_period_score) +
-                       crit_pop_power * np.log(crit_pop_period_score)) /
-                      (year_power + crit_pop_power))
+                         crit_pop_power * np.log(crit_pop_period_score)) /
+                        (year_power + crit_pop_power))
         return period
 
     def calculate_next_update(self, date_updated, period, firsttime_period, weibull_lambda=1.5, min_period=500):
@@ -174,6 +179,8 @@ class Updater(object):
         elif source_to_update['source'].startswith('imdb'):
             infoset = re.search(r'imdb_(.*)', source_to_update['source']).groups()[0]
             movie = self.imdb_scraper.refresh_movie(movie, infoset=infoset)
+        elif source_to_update['source'] == 'ptp':
+            movie = self.ptp_scraper.refresh_movie(movie)
         if movie is not None:
             db.set_movie(movie)
 
@@ -182,5 +189,6 @@ class Updater(object):
         movie = self.crit_scraper.refresh_movie(movie)
         movie = self.omdb_scraper.refresh_movie(movie)
         movie = self.imdb_scraper.refresh_movie(movie, infoset='main')
+        movie = self.ptp_scraper.refresh_movie(movie)
         if movie is not None:
             db.set_movie(movie)

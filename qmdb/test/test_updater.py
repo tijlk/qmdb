@@ -63,11 +63,12 @@ def test_get_update_sequence():
     updater = Updater()
     updater.get_movies_stats(db)
     seq = updater.get_all_next_updates(db, weibull_lambda=10000)
-    assert len(seq) == 43
+    assert len(seq) == 48
     for e in seq:
         assert isinstance(e, dict)
     assert len([e for e in seq if e['source'] == 'criticker']) == 5
     assert len([e for e in seq if e['source'] == 'omdb']) == 3
+    assert len([e for e in seq if e['source'] == 'ptp']) == 5
     remove_test_tables(db)
 
 
