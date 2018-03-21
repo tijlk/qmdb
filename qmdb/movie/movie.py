@@ -74,6 +74,13 @@ class Movie(object):
         else:
             raise Exception("the provided entry is of an incompatible data type!")
 
+    @staticmethod
+    def none_bool(b):
+        if b is None:
+            return None
+        else:
+            return bool(b)
+
     def update_from_dict(self, movie_info):
         if not isinstance(movie_info, dict):
             raise TypeError("A Movie object should be initialized with a dictionary!")
@@ -117,7 +124,8 @@ class Movie(object):
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
         self.vote_details = self.replace_if_not_none(movie_info.get('vote_details'), self.vote_details)
         self.ptp_url = self.replace_if_not_none(movie_info.get('ptp_url'), self.ptp_url)
-        self.ptp_hd_available = self.replace_if_not_none(bool(movie_info.get('ptp_hd_available')), self.ptp_hd_available)
+        self.ptp_hd_available = self.replace_if_not_none(self.none_bool(movie_info.get('ptp_hd_available')),
+                                                         self.ptp_hd_available)
         if movie_info.get('my_ratings') is not None:
             for user in movie_info.get('my_ratings'):
                 if user in self.my_ratings:
