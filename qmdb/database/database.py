@@ -150,6 +150,17 @@ class MySQLDatabase(Database):
             'type': 'varchar(32) not null',
             'score': 'float'
         }
+        self.columns_netflix_genres = {
+            'genreid': 'int unsigned not null',
+            'movies_updated': 'varchar(32)'
+        }
+        self.columns_unogs_suspension = {
+            'id': 'tinyint unsigned not null',
+            'last_suspension': 'varchar(32)'
+        }
+        self.netflix_genres = None
+        self.unogs_suspension = None
+        self.imdbid_to_critid = {}
         super().__init__(from_scratch=from_scratch)
 
     def load_or_initialize(self, from_scratch=False):
@@ -202,6 +213,8 @@ class MySQLDatabase(Database):
         self.create_table('taglines', self.columns_taglines, ['crit_id', 'rank'], ['rank'])
         self.create_table('vote_details', self.columns_vote_details, ['crit_id', 'demographic'], ['demographic'])
         self.create_table('ratings', self.columns_ratings, ['crit_id', 'user', 'type'], ['user', 'type'])
+        self.create_table('netflix_genres', self.columns_netflix_genres, ['genreid'], ['movies_updated'])
+        self.create_table('unogs_suspension', self.columns_unogs_suspension, ['id'], ['last_suspension'])
         self.close()
 
     def load(self, verbose=False):
@@ -216,9 +229,26 @@ class MySQLDatabase(Database):
         self.load_vote_details(movies)
         self.load_ratings(movies)
         self.everything_to_movie(movies)
+        self.load_netflix_genres()
+        self.load_unogs_suspension()
         self.close()
         if verbose:
             print("database loaded.")
+
+    def create_imdbid_to_crit_id_dict(self):
+        self.imdbid_to_critid = {}
+        for movie in self.movies:
+            if movie.imdbid is not None:
+                crit_id = self.imdbid_to_critid.get(movie.imdbid)
+                if isinstance(crit_id, int):
+                    self.imdbid_to_critid[movie.imdbid] = {crit_id, movie.crit_id}
+                elif isinstance(crit_id, set):
+                    crit_id.add(movie.crit_id)
+                else:
+                    crit_id = movie.crit_id
+                if isinstance(crit_id, set) and len(crit_id) == 1:
+                    crit_id = crit_id[0]
+                self.imdbid_to_critid[movie.imdbid] = crit_id
 
     def load_table(self, tbl):
         try:
@@ -232,6 +262,20 @@ class MySQLDatabase(Database):
         print("Loading movies...")
         movies = self.load_table('movies')
         return {movie['crit_id']: movie for movie in movies}
+
+    def load_netflix_genres(self):
+        print("Loading netflix genres...")
+        netflix_genres = self.load_table('netflix_genres')
+        self.netflix_genres = {e['genreid']: arrow.get(e['movies_updated']) if e['movies_updated'] is not None else None
+                               for e in netflix_genres}
+
+    def load_unogs_suspension(self):
+        print("Loading Unogs suspension...")
+        unogs_suspension = self.load_table('unogs_suspension')
+        if len(unogs_suspension) > 0:
+            self.unogs_suspension = arrow.get(unogs_suspension[0]['last_suspension'])
+        else:
+            self.unogs_suspension = None
 
     def load_persons(self, movies):
         print("Loading people...")
@@ -347,6 +391,14 @@ class MySQLDatabase(Database):
         self.update_multiple_records('taglines', self.movie_to_dict_taglines(movie))
         self.update_multiple_records('ratings', self.movie_to_dict_ratings(movie))
         self.update_multiple_records('vote_details', self.movie_to_dict_vote_details(movie))
+
+    def set_netflix_genres(self):
+        for genre in self.netflix_genres:
+            self.update_single_record('netflix_genres', {'genreid': genre,
+                                                         'movies_updated': self.netflix_genres[genre]})
+
+    def set_unogs_suspension(self):
+        self.update_single_record('unogs_suspension', {'id': 1, 'last_suspension': self.unogs_suspension})
 
     def update_single_record(self, tbl, d):
         self.connect()

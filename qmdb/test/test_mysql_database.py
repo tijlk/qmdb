@@ -230,3 +230,27 @@ def test_parse_store_load_persons():
     assert db.movies[1234].cast[0]['name'] == 'Hugh Jackman'
     assert db.movies[1234].director[0]['name'] == 'James Mangold'
     assert db.movies[1234].writer[1]['name'] == 'Scott Frank'
+
+
+def test_load_netflix_genres():
+    create_test_tables()
+    db = MySQLDatabase(schema='qmdb_test', env='test')
+    db.connect()
+    db.load_netflix_genres()
+    assert db.netflix_genres == {1: arrow.get('2018-02-04 23:01:58+01:00'),
+                                 2: None}
+
+
+def test_create_imdbid_to_crit_id_dict():
+    create_test_tables()
+    db = MySQLDatabase(schema='qmdb_test', env='test')
+    db.movies = {1: Movie({'crit_id': 1,
+                           'imdbid': 101}),
+                 2: Movie({'crit_id': 2,
+                           'imdbid': 102}),
+                 3: Movie({'crit_id': 3,
+                           'imdbid': 102}),
+                 4: Movie({'crit_id': 4,
+                           'imdbid': None})}
+    db.create_imdbid_to_crit_id_dict()
+    assert db.imdbid_to_critid == {101: 1, 102: {2, 3}}
