@@ -2,6 +2,7 @@ import json
 
 import arrow
 import requests
+from requests import ConnectionError
 
 from qmdb.config import config
 from qmdb.interfaces.interfaces import Scraper
@@ -42,7 +43,7 @@ class PassThePopcornScraper(Scraper):
     def get_movie_info(self, imdbid):
         try:
             r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
-        except SessionLoggedOutError:
+        except (SessionLoggedOutError, ConnectionError):
             self.create_session()
             r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
         j = json.loads(r.text)
