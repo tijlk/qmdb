@@ -43,9 +43,14 @@ class PassThePopcornScraper(Scraper):
     def get_movie_info(self, imdbid):
         try:
             r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
-        except (SessionLoggedOutError, ConnectionError):
+        except SessionLoggedOutError:
             self.create_session()
-            r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
+            try:
+                r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
+            except ConnectionError:
+                return None
+        except ConnectionError:
+            return None
         j = json.loads(r.text)
         try:
             ptp_movie = j['Movies'][0]
