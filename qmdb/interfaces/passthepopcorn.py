@@ -2,6 +2,7 @@ import json
 
 import arrow
 import requests
+from requests import ConnectionError
 
 from qmdb.config import config
 from qmdb.interfaces.interfaces import Scraper
@@ -23,8 +24,8 @@ class PassThePopcornScraper(Scraper):
     def refresh_movie(self, movie):
         super().refresh_movie(movie)
         movie_info = self.get_movie_info(movie.imdbid)
-        movie_info['crit_id'] = movie.crit_id
         if isinstance(movie_info, dict):
+            movie_info['crit_id'] = movie.crit_id
             movie_info['ptp_updated'] = arrow.now()
             movie.update_from_dict(movie_info)
             return movie
@@ -44,7 +45,12 @@ class PassThePopcornScraper(Scraper):
             r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
         except SessionLoggedOutError:
             self.create_session()
-            r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
+            try:
+                r = self.get_ptp_request('https://passthepopcorn.me/torrents.php?searchstr=tt{}&json=noredirect'.format(imdbid))
+            except ConnectionError:
+                return None
+        except ConnectionError:
+            return None
         j = json.loads(r.text)
         try:
             ptp_movie = j['Movies'][0]
