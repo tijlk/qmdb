@@ -140,7 +140,7 @@ class Updater(object):
         return np.exp(stats['a_parameter']*np.power(feature, stats['b_parameter']))
 
     @staticmethod
-    def calculate_update_period(year_period_score, crit_pop_period_score, year_power=1,
+    def calculate_update_period(year_period_score, crit_pop_period_score, year_power=2,
                                 crit_pop_power=1):
         period = np.exp((year_power * np.log(year_period_score) +
                          crit_pop_power * np.log(crit_pop_period_score)) /
