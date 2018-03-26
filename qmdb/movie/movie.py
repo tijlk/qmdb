@@ -153,3 +153,17 @@ class Movie(object):
                                                           self.imdb_plot_updated)
         self.ptp_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('ptp_updated')),
                                                     self.ptp_updated)
+
+    def get_floating_release_year(self):
+        if self.original_release_date is None:
+            if self.imdb_year is None:
+                return self.year + 0.5
+            else:
+                return self.imdb_year + 0.5
+        else:
+            reldate_ts = self.original_release_date.float_timestamp
+            year = arrow.get(self.original_release_date).year
+            yearstart_ts = arrow.get(str(year) + "-01-01").float_timestamp
+            yearend_ts = arrow.get(str(year+1) + "-01-01").float_timestamp
+            year_length = yearend_ts - yearstart_ts
+            return year + (reldate_ts - yearstart_ts)/year_length

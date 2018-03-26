@@ -75,7 +75,7 @@ class Updater(object):
         return
 
     def get_movies_stats(self, db):
-        years_numbers = [db.movies[crit_id].year for crit_id in db.movies]
+        years_numbers = [db.movies[crit_id].get_floating_release_year() for crit_id in db.movies]
         years = {'min': np.min(years_numbers),
                  'median': np.median(years_numbers),
                  'max': np.max(years_numbers)}
