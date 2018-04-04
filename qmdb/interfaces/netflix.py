@@ -64,7 +64,11 @@ class NetflixScraper:
         return r.json()
 
     def get_genre_ids(self):
-        rjson = self.do_unogs_request("https://unogs-unogs-v1.p.mashape.com/api.cgi?t=genres")
+        try:
+            rjson = self.do_unogs_request("https://unogs-unogs-v1.p.mashape.com/api.cgi?t=genres")
+        except NoUnogsRequestsRemaining:
+            print("No more requests available for Unogs!... Stopping.")
+            return None
         for d in rjson['ITEMS']:
             genre_name = list(d.keys())[0]
             genreids = d[genre_name]
