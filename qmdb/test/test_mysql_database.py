@@ -298,6 +298,7 @@ def test_add_missing_columns():
             column_type
         FROM information_schema.columns 
         WHERE table_name='netflix_genres'
+          AND table_schema='qmdb_test'
         """)
     actual_cols = db.c.fetchall()
     actual_cols_dict = {d['column_name']: d['column_type'] for d in actual_cols}

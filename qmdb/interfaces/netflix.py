@@ -53,7 +53,7 @@ class NetflixScraper:
 
     def do_unogs_request(self, url):
         if self.unogs_requests_remaining is not None and self.unogs_requests_remaining < 1:
-            raise Exception("No more requests remaining for UNOGS!")
+            raise NoUnogsRequestsRemaining
         r = requests.get(url, headers={"X-Mashape-Key": self.mashapekey, "Accept": "application/json"})
         self.unogs_requests_remaining = int(r.headers._store['x-ratelimit-requests-remaining'][1])
         if self.unogs_requests_remaining == 0:
@@ -140,13 +140,14 @@ class NetflixScraper:
             try:
                 movies = self.get_movies_for_genre(genreid, country_code=country_code)
             except NoUnogsRequestsRemaining:
-                print("No more requests available for Unogs!")
+                print("No more requests available for Unogs!... Stopping.")
+                break
             else:
                 self.db.netflix_genres[genreid]['movies_updated'] = arrow.now()
-                self.db.save_movies(movies)
+                self.db.save_movies(movies, verbose=False)
                 self.db.set_netflix_genres()
 
 
 class NoUnogsRequestsRemaining(Exception):
     def __init__(self):
-        pass
+        print("No more requests available for Unogs!... (init)")

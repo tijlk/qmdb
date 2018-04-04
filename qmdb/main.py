@@ -24,5 +24,7 @@ if __name__ == "__main__":
         while time.time() - time0 <= 12*3600:
             updater.update_movies(db, n=30, weibull_lambda=3)
         crit_scraper.get_movies(db, start_popularity=2)
+        netflix_scraper.get_genre_ids()
+        netflix_scraper.get_movies_for_genres()
         crit_scraper.get_ratings(db)
         modeler.get_predictions()
