@@ -66,8 +66,13 @@ def create_test_tables(variant='normal', env='tst'):
                             'canonical_name': 'Portman, Natalie',
                             'person_id': 18}]
         netflix_genres_records = [{'genreid': 1,
+                                   'genre_name': 'All Action',
+                                   'movies_updated': arrow.get('2018-02-04 23:01:58+01:00')},
+                                  {'genreid': 1,
+                                   'genre_name': 'All Anime',
                                    'movies_updated': arrow.get('2018-02-04 23:01:58+01:00')},
                                   {'genreid': 2,
+                                   'genre_name': 'All Anime',
                                    'movies_updated': None}]
     elif variant == 'updates':
         movies_records = [{'crit_id': 1234,

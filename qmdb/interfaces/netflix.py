@@ -1,11 +1,11 @@
-import json
+import copy
+from datetime import timedelta
 
 import arrow
 import requests
+from bs4 import BeautifulSoup
 
 from qmdb.config import config
-from bs4 import BeautifulSoup
-from datetime import timedelta
 
 
 class NetflixScraper:
@@ -36,6 +36,7 @@ class NetflixScraper:
         self.authURL = soup.find("input", attrs={'name': 'authURL'}).attrs['value']
 
     def create_session(self):
+        # TODO: Work in Progress
         r1 = self.session.post("https://signup.netflix.com/Login",
                                data={"email": self.email, "password": self.password, "authURL": self.authURL})
         genres = '0,"to":1'
@@ -54,26 +55,27 @@ class NetflixScraper:
         if self.unogs_requests_remaining is not None and self.unogs_requests_remaining < 1:
             raise Exception("No more requests remaining for UNOGS!")
         r = requests.get(url, headers={"X-Mashape-Key": self.mashapekey, "Accept": "application/json"})
-
         self.unogs_requests_remaining = int(r.headers._store['x-ratelimit-requests-remaining'][1])
         if self.unogs_requests_remaining == 0:
             self.db.unogs_suspension = arrow.now()
             self.unogs_last_suspension = self.db.unogs_suspension
             self.db.set_unogs_suspension()
+            raise NoUnogsRequestsRemaining
         return r.json()
 
     def get_genre_ids(self):
         rjson = self.do_unogs_request("https://unogs-unogs-v1.p.mashape.com/api.cgi?t=genres")
-        list_of_lists = [list(g.values())[0] for g in rjson['ITEMS']]
-        genreids = sorted(list(set([item for sublist in list_of_lists for item in sublist])))
-        for genreid in genreids:
-            if genreid not in self.db.netflix_genres:
-                self.db.netflix_genres.update({genreid: None})
-        print("{} genres listed. {} now in the database.".format(len(genreids), len(self.db.netflix_genres)))
+        for d in rjson['ITEMS']:
+            genre_name = list(d.keys())[0]
+            genreids = d[genre_name]
+            for genreid in genreids:
+                if genreid not in self.db.netflix_genres:
+                    self.db.netflix_genres[genreid] = {'genre_names': [], 'movies_updated': None}
+                if genre_name not in self.db.netflix_genres[genreid]['genre_names']:
+                    self.db.netflix_genres[genreid]['genre_names'].append(genre_name)
         self.db.set_netflix_genres()
 
-    @staticmethod
-    def unogs_movie_info_to_dict(d):
+    def unogs_movie_info_to_dict(self, d):
         netflix_id = d.get('netflixid')
         if netflix_id is not None:
             netflix_id = int(netflix_id)
@@ -82,22 +84,40 @@ class NetflixScraper:
         if netflix_rating is not None:
             netflix_rating = float(netflix_rating)
         imdbid = d.get('imdbid')
-        if imdbid is not None and imdbid != 'notfound':
+        if imdbid is not None and imdbid not in ('', 'notfound'):
             imdbid = int(imdbid[2:])
         else:
-            imdbid = None
+            return None
         return {'netflix_id': netflix_id,
                 'netflix_title': netflix_title,
                 'netflix_rating': netflix_rating,
-                'imdbid': imdbid}
+                'imdbid': imdbid,
+                'netflix_updated': arrow.now()}
+
+    def get_critid_from_imdbid(self, imdbid):
+        return self.db.imdbid_to_critid.get(imdbid)
 
     def get_movies_for_genre_page(self, genreid, country_code=67, pagenr=1):
         rjson = self.do_unogs_request(("https://unogs-unogs-v1.p.mashape.com/aaapi.cgi?q={{query}}-!1800,2050-!0,5-!0,10-!{}-!Any-"
-                                       "!Any-!Any-!Any-!{{downloadable}}&t=ns&cl={}&st=adv&ob=Relevance&p={}&sa=and")
-                                      .format(genreid, country_code, pagenr))
+                                           "!Any-!Any-!Any-!{{downloadable}}&t=ns&cl={}&st=adv&ob=Relevance&p={}&sa=and")
+                                          .format(genreid, country_code, pagenr))
         nr_pages = int(rjson['COUNT']) // 100 + 1
         movies = [self.unogs_movie_info_to_dict(d) for d in rjson['ITEMS']]
-        return nr_pages, movies
+        movies = [movie for movie in movies if movie is not None]
+        movies_with_critid = []
+        for movie in movies:
+            crit_id = self.get_critid_from_imdbid(movie['imdbid'])
+            if isinstance(crit_id, set):
+                for id in crit_id:
+                    movie_copy = copy.deepcopy(movie)
+                    movie_copy['crit_id'] = id
+                    movies_with_critid.append(movie_copy)
+            elif isinstance(crit_id, int):
+                movie['crit_id'] = crit_id
+                movies_with_critid.append(movie)
+            else:
+                pass
+        return nr_pages, movies_with_critid
 
     def get_movies_for_genre(self, genreid, country_code=67):
         movies = []
@@ -109,5 +129,24 @@ class NetflixScraper:
         return movies
 
     def get_movies_for_genres(self, country_code=67):
-        for genreid in self.db.netflix_genres:
-            movies = self.get_movies_for_genre(genreid, country_code=country_code)
+        genreids_to_update = [{'genreid': g, 'movies_updated': self.db.netflix_genres[g]['movies_updated']
+                               if self.db.netflix_genres[g]['movies_updated'] is not None else arrow.get('2000-01-01')}
+                              for g in self.db.netflix_genres if self.db.netflix_genres[g]['movies_updated'] is None
+                              or (arrow.now() - self.db.netflix_genres[g]['movies_updated']).days >= 7]
+        genreids_to_update = sorted(genreids_to_update, key=lambda k: k['movies_updated'])
+        genreids_to_update = [g['genreid'] for g in genreids_to_update]
+        for genreid in genreids_to_update:
+            print("Getting movies for genreid {} ({})".format(genreid, self.db.netflix_genres[genreid]['genre_names']))
+            try:
+                movies = self.get_movies_for_genre(genreid, country_code=country_code)
+            except NoUnogsRequestsRemaining:
+                print("No more requests available for Unogs!")
+            else:
+                self.db.netflix_genres[genreid]['movies_updated'] = arrow.now()
+                self.db.save_movies(movies)
+                self.db.set_netflix_genres()
+
+
+class NoUnogsRequestsRemaining(Exception):
+    def __init__(self):
+        pass

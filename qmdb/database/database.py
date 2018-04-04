@@ -58,7 +58,20 @@ class Database:
         for k in d:
             if isinstance(d[k], Arrow):
                 d[k] = d[k].format()
+            if isinstance(d[k], list):
+                d[k] = [e.format() if isinstance(e, Arrow) else e for e in d[k]]
         return d
+
+
+def max_date(l):
+    if len(l) > 0:
+        m = max([e for e in l if e is not None], default=None)
+        if m is not None:
+            return arrow.get(m)
+        else:
+            return None
+    else:
+        return None
 
 
 class MySQLDatabase(Database):
@@ -95,6 +108,9 @@ class MySQLDatabase(Database):
             'trailer_url': 'varchar(256)',
             'ptp_url': 'varchar(64)',
             'ptp_hd_available': 'tinyint unsigned',
+            'netflix_id': 'int unsigned',
+            'netflix_title': 'varchar(256)',
+            'netflix_rating': 'float',
             'date_added': 'varchar(32) not null',
             'criticker_updated': 'varchar(32)',
             'imdb_main_updated': 'varchar(32)',
@@ -105,7 +121,8 @@ class MySQLDatabase(Database):
             'imdb_vote_details_updated': 'varchar(32)',
             'imdb_plot_updated': 'varchar(32)',
             'omdb_updated': 'varchar(32)',
-            'ptp_updated': 'varchar(32)'
+            'ptp_updated': 'varchar(32)',
+            'netflix_updated': 'varchar(32)'
         }
         self.columns_persons = {
             'crit_id': 'mediumint unsigned not null',
@@ -152,6 +169,7 @@ class MySQLDatabase(Database):
         }
         self.columns_netflix_genres = {
             'genreid': 'int unsigned not null',
+            'genre_name': 'varchar(128)',
             'movies_updated': 'varchar(32)'
         }
         self.columns_unogs_suspension = {
@@ -162,10 +180,13 @@ class MySQLDatabase(Database):
         self.unogs_suspension = None
         self.imdbid_to_critid = {}
         super().__init__(from_scratch=from_scratch)
+        self.create_imdbid_to_crit_id_dict()
 
     def load_or_initialize(self, from_scratch=False):
         if from_scratch:
+            self.connect()
             self.initialize()
+            self.close()
         else:
             try:
                 self.load()
@@ -202,20 +223,33 @@ class MySQLDatabase(Database):
                            '), INDEX('.join(indexes))
             self.c.execute(sql)
 
-    def initialize(self):
-        self.connect()
-        self.create_table('movies', self.columns_movies, ['crit_id'], ['crit_id'])
-        self.create_table('persons', self.columns_persons, ['crit_id', 'person_id', 'role'], ['person_id', 'role'])
-        self.create_table('genres', self.columns_genres, ['crit_id', 'genre'], ['genre'])
-        self.create_table('countries', self.columns_countries, ['crit_id', 'country'], ['country'])
-        self.create_table('languages', self.columns_languages, ['crit_id', 'language'], ['language'])
-        self.create_table('keywords', self.columns_keywords, ['crit_id', 'keyword'], ['keyword'])
-        self.create_table('taglines', self.columns_taglines, ['crit_id', 'rank'], ['rank'])
-        self.create_table('vote_details', self.columns_vote_details, ['crit_id', 'demographic'], ['demographic'])
-        self.create_table('ratings', self.columns_ratings, ['crit_id', 'user', 'type'], ['user', 'type'])
-        self.create_table('netflix_genres', self.columns_netflix_genres, ['genreid'], ['movies_updated'])
-        self.create_table('unogs_suspension', self.columns_unogs_suspension, ['id'], ['last_suspension'])
-        self.close()
+    def initialize(self, tbls=None):
+        if tbls is None:
+            tbls = ['movies', 'persons', 'genres', 'countries', 'languages',
+                    'keywords', 'taglines', 'vote_details', 'ratings',
+                    'netflix_genres', 'unogs_suspension']
+        if 'movies' in tbls:
+            self.create_table('movies', self.columns_movies, ['crit_id'], ['crit_id'])
+        if 'persons' in tbls:
+            self.create_table('persons', self.columns_persons, ['crit_id', 'person_id', 'role'], ['person_id', 'role'])
+        if 'genres' in tbls:
+            self.create_table('genres', self.columns_genres, ['crit_id', 'genre'], ['genre'])
+        if 'countries' in tbls:
+            self.create_table('countries', self.columns_countries, ['crit_id', 'country'], ['country'])
+        if 'languages' in tbls:
+            self.create_table('languages', self.columns_languages, ['crit_id', 'language'], ['language'])
+        if 'keywords' in tbls:
+            self.create_table('keywords', self.columns_keywords, ['crit_id', 'keyword'], ['keyword'])
+        if 'taglines' in tbls:
+            self.create_table('taglines', self.columns_taglines, ['crit_id', 'rank'], ['rank'])
+        if 'vote_details' in tbls:
+            self.create_table('vote_details', self.columns_vote_details, ['crit_id', 'demographic'], ['demographic'])
+        if 'ratings' in tbls:
+            self.create_table('ratings', self.columns_ratings, ['crit_id', 'user', 'type'], ['user', 'type'])
+        if 'netflix_genres' in tbls:
+            self.create_table('netflix_genres', self.columns_netflix_genres, ['genreid', 'genre_name'], ['movies_updated'])
+        if 'unogs_suspension' in tbls:
+            self.create_table('unogs_suspension', self.columns_unogs_suspension, ['id'], ['last_suspension'])
 
     def load(self, verbose=False):
         self.connect()
@@ -237,11 +271,12 @@ class MySQLDatabase(Database):
 
     def create_imdbid_to_crit_id_dict(self):
         self.imdbid_to_critid = {}
-        for movie in self.movies:
+        for crit_id in self.movies:
+            movie = self.movies[crit_id]
             if movie.imdbid is not None:
                 crit_id = self.imdbid_to_critid.get(movie.imdbid)
                 if isinstance(crit_id, int):
-                    self.imdbid_to_critid[movie.imdbid] = {crit_id, movie.crit_id}
+                    crit_id = {crit_id, movie.crit_id}
                 elif isinstance(crit_id, set):
                     crit_id.add(movie.crit_id)
                 else:
@@ -252,6 +287,7 @@ class MySQLDatabase(Database):
 
     def load_table(self, tbl):
         try:
+            self.add_missing_columns(tbl)
             self.c.execute("select * from {}".format(tbl))
         except pymysql.err.ProgrammingError:
             print("The {} table does not exist!".format(tbl))
@@ -265,9 +301,12 @@ class MySQLDatabase(Database):
 
     def load_netflix_genres(self):
         print("Loading netflix genres...")
-        netflix_genres = self.load_table('netflix_genres')
-        self.netflix_genres = {e['genreid']: arrow.get(e['movies_updated']) if e['movies_updated'] is not None else None
-                               for e in netflix_genres}
+        netflix_genres = sorted(self.load_table('netflix_genres'), key=lambda k: k['genreid'])
+        self.netflix_genres = {}
+        for k, v in groupby(netflix_genres, key=lambda x: x['genreid']):
+            l = list(v)
+            self.netflix_genres[k] = {'genre_names': sorted(list(set([e['genre_name'] for e in l]))),
+                                      'movies_updated': max_date([e['movies_updated'] for e in l])}
 
     def load_unogs_suspension(self):
         print("Loading Unogs suspension...")
@@ -393,9 +432,16 @@ class MySQLDatabase(Database):
         self.update_multiple_records('vote_details', self.movie_to_dict_vote_details(movie))
 
     def set_netflix_genres(self):
+        self.connect()
+        self.c.execute("truncate table netflix_genres")
+        self.close()
         for genre in self.netflix_genres:
-            self.update_single_record('netflix_genres', {'genreid': genre,
-                                                         'movies_updated': self.netflix_genres[genre]})
+            netflix_genre_dict = {'genreid': genre,
+                                  'genre_name': self.netflix_genres[genre]['genre_names']}
+            netflix_genre_dict['n_rows'] = len(netflix_genre_dict['genre_name'])
+            netflix_genre_dict['movies_updated'] = [self.netflix_genres[genre]['movies_updated']] * \
+                netflix_genre_dict['n_rows']
+            self.update_multiple_records('netflix_genres', netflix_genre_dict, key='genreid')
 
     def set_unogs_suspension(self):
         self.update_single_record('unogs_suspension', {'id': 1, 'last_suspension': self.unogs_suspension})
@@ -413,29 +459,30 @@ class MySQLDatabase(Database):
         self.c.execute(sql, values)
         self.close()
 
-    @staticmethod
-    def create_insert_multiple_records_sql(tbl, d):
-        keys = [key for key in list(d.keys()) if key not in ['crit_id', 'n_rows']]
-        sql = "insert into {} (crit_id, {}) values ".format(tbl, ', '.join(keys))
+    def create_insert_multiple_records_sql(self, tbl, d, key='crit_id'):
+        d = self.make_dict_db_safe(d)
+        keys = [k for k in list(d.keys()) if k not in [key, 'n_rows']]
+        sql = "insert into {} ({}, {}) values ".format(tbl, key, ', '.join(keys))
         rows = []
         for i in range(d['n_rows']):
             rows.append("(%s, " + ', '.join(["%s" for _ in keys]) + ")")
         sql += ', '.join(rows)
         values = []
         for i in range(d['n_rows']):
-            values += [d['crit_id']] + [d[key][i] for key in keys]
+            values += [d[key]] + [d[k][i] for k in keys]
         return sql, values
 
-    def update_multiple_records(self, tbl, d):
+    def update_multiple_records(self, tbl, d, key='crit_id'):
+        d = self.make_dict_db_safe(d)
         if d['n_rows'] > 0:
             self.connect()
             # Delete existing rows
-            sql = "delete from {} where crit_id = %s".format(tbl)
-            values = [d['crit_id']]
+            sql = "delete from {} where {} = %s".format(tbl, key)
+            values = [d[key]]
             self.c.execute(sql, values)
             self.conn.commit()
             # Add new rows
-            sql, values = self.create_insert_multiple_records_sql(tbl, d)
+            sql, values = self.create_insert_multiple_records_sql(tbl, d, key=key)
             self.c.execute(sql, values)
             self.close()
 
@@ -444,10 +491,13 @@ class MySQLDatabase(Database):
         self.c.execute("drop table if exists {}".format(table_name))
         self.close()
 
-    def add_column(self, column_name, column_datatype, table_name='movies', after=None):
-        self.connect()
+    def add_column(self, column_name, column_datatype, table_name='movies', after=None, first=False):
         sql = "alter table {} add column {} {}".format(table_name, column_name, column_datatype)
-        if after is not None:
+        if first:
+            sql += " first"
+            if after is not None:
+                raise Exception("Can't use both 'after' and 'first' keyword parameters'")
+        elif after is not None:
             sql += " after {}".format(after)
         try:
             self.c.execute(sql)
@@ -457,21 +507,47 @@ class MySQLDatabase(Database):
                 raise Exception
             else:
                 print("{} already in table {}".format(e.args[1], table_name))
-        finally:
-            self.close()
 
     def add_columns(self, columns, table_name='movies'):
         if isinstance(table_name, str):
             for column in columns:
                 self.add_column(column['column_name'], column['column_datatype'],
-                                table_name=table_name, after=column.get('after'))
+                                table_name=table_name, after=column.get('after'), first=column.get('first'))
         elif isinstance(table_name, list):
             for table in table_name:
                 for column in columns:
                     self.add_column(column['column_name'], column['column_datatype'],
-                                    table_name=table, after=column.get('after'))
+                                    table_name=table, after=column.get('after'), first=column.get('first'))
         else:
             raise Exception
+
+    def add_missing_columns(self, table_name):
+        desired_columns = getattr(self, 'columns_' + table_name)
+        desired_columns = {k: {'column_name': k, 'column_type': desired_columns[k]} for k in desired_columns}
+        self.c.execute("""
+            SELECT column_name,
+                   column_type
+              FROM information_schema.columns 
+             WHERE table_name='{}'
+               AND table_schema='{}'
+            """.format(table_name, self.schema))
+        actual_columns = {d['column_name']: d for d in self.c.fetchall()}
+        if len(actual_columns) == 0:
+            # Table is missing!
+            self.initialize(tbls=[table_name])
+        for col in desired_columns:
+            cols = list(desired_columns.keys())
+            index = cols.index(col)
+            if index == 0:
+                after = None
+                first = True
+            else:
+                after = cols[cols.index(col)-1]
+                first = False
+            if col not in actual_columns:
+                print("Adding column {}".format(col))
+                self.add_column(col, desired_columns[col]['column_type'],
+                                table_name=table_name, after=after, first=first)
 
     def movie_to_dict_movies(self, movie):
         d = {k: v for k, v in vars(movie).items()
@@ -616,6 +692,8 @@ class MySQLDatabase(Database):
         time_taken = time.time() - time0
         print("...took {:.1f} minuters".format(time_taken/60))
         self.print()
+
+
 
 
 class MovieNotInDatabaseError(Exception):

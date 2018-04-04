@@ -8,7 +8,7 @@ import time
 
 
 if __name__ == "__main__":
-    db = MySQLDatabase(from_scratch=False, env='test')
+    db = MySQLDatabase(from_scratch=False)
     omdb_scraper = OMDBScraper()
     crit_scraper = CritickerScraper(user='tijl')
     updater = Updater()
