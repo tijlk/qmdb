@@ -122,6 +122,7 @@ class MySQLDatabase(Database):
             'imdb_plot_updated': 'varchar(32)',
             'omdb_updated': 'varchar(32)',
             'ptp_updated': 'varchar(32)',
+            'unogs_updated': 'varchar(32)',
             'netflix_updated': 'varchar(32)'
         }
         self.columns_persons = {

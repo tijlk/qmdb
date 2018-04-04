@@ -96,7 +96,7 @@ class NetflixScraper:
                 'netflix_title': netflix_title,
                 'netflix_rating': netflix_rating,
                 'imdbid': imdbid,
-                'netflix_updated': arrow.now()}
+                'unogs_updated': arrow.now()}
 
     def get_critid_from_imdbid(self, imdbid):
         return self.db.imdbid_to_critid.get(imdbid)
