@@ -65,6 +65,15 @@ def create_test_tables(variant='normal', env='tst'):
                             'rank': 1,
                             'canonical_name': 'Portman, Natalie',
                             'person_id': 18}]
+        netflix_genres_records = [{'genreid': 1,
+                                   'genre_name': 'All Action',
+                                   'movies_updated': arrow.get('2018-02-04 23:01:58+01:00')},
+                                  {'genreid': 1,
+                                   'genre_name': 'All Anime',
+                                   'movies_updated': arrow.get('2018-02-04 23:01:58+01:00')},
+                                  {'genreid': 2,
+                                   'genre_name': 'All Anime',
+                                   'movies_updated': None}]
     elif variant == 'updates':
         movies_records = [{'crit_id': 1234,
                            'crit_popularity': 10,
@@ -118,20 +127,25 @@ def create_test_tables(variant='normal', env='tst'):
                            'date_added': arrow.get('2018-01-01 00:00:00+01:00')}]
         languages_records = []
         persons_records = []
+        netflix_genres_records = []
     else:
         movies_records = []
         languages_records = []
         persons_records = []
+        netflix_genres_records = []
     for rec in movies_records:
         db.update_single_record('movies', rec)
     for rec in languages_records:
         db.update_single_record('languages', rec)
     for rec in persons_records:
         db.update_single_record('persons', rec)
+    for rec in netflix_genres_records:
+        db.update_single_record('netflix_genres', rec)
 
 
 def remove_test_tables(db):
-    for tbl in ['countries', 'genres', 'keywords', 'languages', 'movies', 'persons', 'taglines', 'vote_details']:
+    for tbl in ['countries', 'genres', 'keywords', 'languages', 'movies',
+                'persons', 'taglines', 'vote_details', 'netflix_genres']:
         db.remove_table(table_name=tbl)
 
 

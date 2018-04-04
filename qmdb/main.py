@@ -3,6 +3,7 @@ from qmdb.interfaces.omdb import OMDBScraper
 from qmdb.interfaces.criticker import CritickerScraper
 from qmdb.interfaces.updater import Updater
 from qmdb.model.predictions import RatingModeler
+from qmdb.interfaces.netflix import NetflixScraper
 import time
 
 
@@ -12,6 +13,10 @@ if __name__ == "__main__":
     crit_scraper = CritickerScraper(user='tijl')
     updater = Updater()
     modeler = RatingModeler(db)
+    netflix_scraper = NetflixScraper(db)
+
+    netflix_scraper.get_genre_ids()
+    netflix_scraper.get_movies_for_genres()
 
     while True:
         print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")

@@ -14,12 +14,17 @@ class PassThePopcornScraper(Scraper):
         self.password = conf['password']
         self.passkey = conf['passkey']
         self.session = requests.Session()
-        self.create_session()
+        self.session_started = False
 
     def create_session(self):
         self.session.post("https://passthepopcorn.me/ajax.php?action=login",
                           data={"username": self.username, "password": self.password, "passkey": self.passkey,
                                 "keeplogged": "0", "login": "Login"}, allow_redirects=False)
+
+    def session_check(self):
+        if not self.session_started:
+            self.create_session()
+            self.session_started = True
 
     def refresh_movie(self, movie):
         super().refresh_movie(movie)
@@ -33,6 +38,7 @@ class PassThePopcornScraper(Scraper):
             return None
 
     def get_ptp_request(self, url):
+        self.session_check()
         r = self.session.get(url)
         if r.status_code != 200:
             raise Exception("ERROR {}. Something went wrong with the request to PassThePopcorn".format(r.status_code))
