@@ -682,18 +682,18 @@ class MySQLDatabase(Database):
             ratings_dict['n_rows'] = len(records)
         return ratings_dict
 
-    def save_movies(self, movies):
-        print("\nSaving movie information to the database...\n")
+    def save_movies(self, movies, verbose=True):
+        if verbose:
+            print("\nSaving movie information to the database...\n")
         time0 = time.time()
         for i, movie_info in enumerate(movies):
             if i > 0 and (i+1) % 1000 == 0:
                 print("   Saving movie {} out of {}".format(i+1, len(movies)))
             self.set_movie(movie_info)
         time_taken = time.time() - time0
-        print("...took {:.1f} minuters".format(time_taken/60))
-        self.print()
-
-
+        if verbose:
+            print("...took {:.1f} minuters".format(time_taken/60))
+            self.print()
 
 
 class MovieNotInDatabaseError(Exception):

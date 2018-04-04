@@ -143,7 +143,7 @@ class NetflixScraper:
                 print("No more requests available for Unogs!")
             else:
                 self.db.netflix_genres[genreid]['movies_updated'] = arrow.now()
-                self.db.save_movies(movies)
+                self.db.save_movies(movies, verbose=False)
                 self.db.set_netflix_genres()
 
 
