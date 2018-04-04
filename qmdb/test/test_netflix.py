@@ -137,7 +137,7 @@ def test_get_movies_for_genres_norequests():
     assert db.netflix_genres[2]['movies_updated'] == arrow.get('2018-03-20')
     assert db.netflix_genres[3]['movies_updated'] is None
     assert db.netflix_genres[4]['movies_updated'] == arrow.get('2018-03-17')
-    assert [call[0][0] for call in netflix_scraper.get_movies_for_genre.call_args_list] == [3, 4, 2]
+    assert [call[0][0] for call in netflix_scraper.get_movies_for_genre.call_args_list] == [3]
     assert db.save_movies.call_count == 0
     assert db.movies[1234].netflix_rating is None
     remove_test_tables(db)
