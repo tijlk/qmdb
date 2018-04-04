@@ -74,6 +74,13 @@ class Movie(object):
         else:
             raise Exception("the provided entry is of an incompatible data type!")
 
+    @staticmethod
+    def none_bool(b):
+        if b is None:
+            return None
+        else:
+            return bool(b)
+
     def update_from_dict(self, movie_info):
         if not isinstance(movie_info, dict):
             raise TypeError("A Movie object should be initialized with a dictionary!")
@@ -117,7 +124,8 @@ class Movie(object):
         self.taglines = self.replace_if_not_none(movie_info.get('taglines'), self.taglines)
         self.vote_details = self.replace_if_not_none(movie_info.get('vote_details'), self.vote_details)
         self.ptp_url = self.replace_if_not_none(movie_info.get('ptp_url'), self.ptp_url)
-        self.ptp_hd_available = self.replace_if_not_none(bool(movie_info.get('ptp_hd_available')), self.ptp_hd_available)
+        self.ptp_hd_available = self.replace_if_not_none(self.none_bool(movie_info.get('ptp_hd_available')),
+                                                         self.ptp_hd_available)
         if movie_info.get('my_ratings') is not None:
             for user in movie_info.get('my_ratings'):
                 if user in self.my_ratings:
@@ -145,3 +153,17 @@ class Movie(object):
                                                           self.imdb_plot_updated)
         self.ptp_updated = self.replace_if_not_none(self.str_to_arrow(movie_info.get('ptp_updated')),
                                                     self.ptp_updated)
+
+    def get_floating_release_year(self):
+        if self.original_release_date is None:
+            if self.imdb_year is None:
+                return self.year + 0.5
+            else:
+                return self.imdb_year + 0.5
+        else:
+            reldate_ts = self.original_release_date.float_timestamp
+            year = arrow.get(self.original_release_date).year
+            yearstart_ts = arrow.get(str(year) + "-01-01").float_timestamp
+            yearend_ts = arrow.get(str(year+1) + "-01-01").float_timestamp
+            year_length = yearend_ts - yearstart_ts
+            return year + (reldate_ts - yearstart_ts)/year_length

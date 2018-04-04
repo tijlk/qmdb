@@ -8,7 +8,7 @@ import time
 
 
 if __name__ == "__main__":
-    db = MySQLDatabase(from_scratch=False)
+    db = MySQLDatabase(from_scratch=False, env='test')
     omdb_scraper = OMDBScraper()
     crit_scraper = CritickerScraper(user='tijl')
     updater = Updater()
@@ -16,6 +16,7 @@ if __name__ == "__main__":
     netflix_scraper = NetflixScraper(db)
 
     netflix_scraper.get_genre_ids()
+    netflix_scraper.get_movies_for_genres()
 
     while True:
         print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")

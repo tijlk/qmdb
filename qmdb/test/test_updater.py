@@ -32,11 +32,11 @@ def test_calculate_final_period():
     updater = Updater()
     update_period = updater.calculate_update_period(10, 15, year_power=1, crit_pop_power=1)
     assert update_period == pytest.approx(12.2474, 0.01)
-    update_period = updater.calculate_update_period(10, 10)
+    update_period = updater.calculate_update_period(10, 10, year_power=1, crit_pop_power=1)
     assert update_period == pytest.approx(10, 0.01)
-    update_period = updater.calculate_update_period(10, 200, crit_pop_power=0)
+    update_period = updater.calculate_update_period(10, 200, year_power=1, crit_pop_power=0)
     assert update_period == pytest.approx(10, 0.01)
-    update_period = updater.calculate_update_period(10, 200, crit_pop_power=1/100)
+    update_period = updater.calculate_update_period(10, 200, year_power=1, crit_pop_power=1/100)
     assert update_period == pytest.approx(10.3010, 0.01)
 
 
