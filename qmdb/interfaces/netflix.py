@@ -85,8 +85,10 @@ class NetflixScraper:
             netflix_id = int(netflix_id)
         netflix_title = d.get('title')
         netflix_rating = d.get('rating')
-        if netflix_rating is not None:
+        try:
             netflix_rating = float(netflix_rating)
+        except ValueError:
+            netflix_rating = None
         imdbid = d.get('imdbid')
         if imdbid is not None and imdbid not in ('', 'notfound', 'unknown'):
             imdbid = int(imdbid[2:])

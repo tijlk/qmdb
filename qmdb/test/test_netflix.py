@@ -51,7 +51,7 @@ def test_unogs_movie_info_to_dict():
     netflix_scraper = NetflixScraper(db)
     movie_info = netflix_scraper.unogs_movie_info_to_dict(
         {'netflixid': '80192014', 'download': '0', 'imdbid': 'tt4797160', 'rating': '0', 'title': 'Larceny'})
-    assert set(movie_info.keys()) == {'netflix_id', 'netflix_title', 'netflix_rating', 'imdbid', 'netflix_updated'}
+    assert set(movie_info.keys()) == {'netflix_id', 'netflix_title', 'netflix_rating', 'imdbid', 'unogs_updated'}
     assert movie_info['netflix_id'] == 80192014
     assert movie_info['netflix_title'] == 'Larceny'
     assert movie_info['netflix_rating'] == 0.0
@@ -59,6 +59,9 @@ def test_unogs_movie_info_to_dict():
     movie_info = netflix_scraper.unogs_movie_info_to_dict(
         {'netflixid': '80192014', 'download': '0', 'imdbid': 'notfound', 'rating': '0', 'title': 'Larceny'})
     assert movie_info is None
+    movie_info = netflix_scraper.unogs_movie_info_to_dict(
+        {'netflixid': '80192014', 'download': '0', 'imdbid': 'tt4797160', 'rating': '', 'title': 'Larceny'})
+    assert movie_info['netflix_rating'] is None
     remove_test_tables(db)
 
 
@@ -76,7 +79,7 @@ def test_get_movies_for_genre_page():
     assert nr_pages == 1
     assert len(movies) == 59
     assert set(movies[0].keys()) == {'netflix_id', 'netflix_title', 'netflix_rating',
-                                     'imdbid', 'crit_id', 'netflix_updated'}
+                                     'imdbid', 'crit_id', 'unogs_updated'}
     remove_test_tables(db)
 
 
