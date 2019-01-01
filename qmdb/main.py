@@ -15,9 +15,6 @@ if __name__ == "__main__":
     modeler = RatingModeler(db)
     netflix_scraper = NetflixScraper(db)
 
-    netflix_scraper.get_genre_ids()
-    netflix_scraper.get_movies_for_genres()
-
     while True:
         print("\nRefreshing movie information from Criticker, IMDb and OMDB\n")
         time0 = time.time()

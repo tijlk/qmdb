@@ -25,7 +25,7 @@ class NetflixScraper:
         self.authURL = None
         self.unogs_last_suspension = self.db.unogs_suspension
         if self.unogs_last_suspension is not None \
-                and arrow.now() - self.unogs_last_suspension <= timedelta(hours=24):
+                and arrow.now() - self.unogs_last_suspension <= timedelta(hours=18):
             self.unogs_requests_remaining = 0
         else:
             self.unogs_requests_remaining = None
@@ -85,10 +85,12 @@ class NetflixScraper:
             netflix_id = int(netflix_id)
         netflix_title = d.get('title')
         netflix_rating = d.get('rating')
-        if netflix_rating is not None:
+        try:
             netflix_rating = float(netflix_rating)
+        except ValueError:
+            netflix_rating = None
         imdbid = d.get('imdbid')
-        if imdbid is not None and imdbid not in ('', 'notfound'):
+        if imdbid is not None and imdbid not in ('', 'notfound', 'unknown'):
             imdbid = int(imdbid[2:])
         else:
             return None

@@ -114,7 +114,7 @@ class CritickerScraper(Scraper):
         """
         a = movie_html.find('a')
         url = a.get('href')
-        id = int(movie_html.find('div', attrs={'class': 'fl_titlelist_score'}).get('titleid'))
+        id = int(movie_html.find('div', attrs={'class': 'fl_titlelist_rating'}).get('titleid'))
         title = a.get('title')
         year = self.get_year_from_movielist_title(a.text)
         movie_info = {'crit_id': id,
@@ -150,7 +150,7 @@ class CritickerScraper(Scraper):
             print("Couldn't process movies on url {}.".format(url))
             return [], 0
         try:
-            nr_pages_text = str(next(soup.find('p', attrs={'id': 'fl_nav_pagenums_page'}).children))
+            nr_pages_text = str(next(soup.find('div', attrs={'id': 'fl_nav_pagenums_page'}).children))
         except AttributeError:
             return [], 0
         nr_pages = int(re.match(r'Page\s+\d+\s+of\s+(\d+)\s*', nr_pages_text).groups()[0])
